@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package dsnet;
+
+option go_package = "gotest/dsnet/proto;dsnet";
+
+// Message envelope
+message Envelope {
+  string from = 1;
+  string to = 2;
+  string payload = 3;
+  MessageType type = 4;
+  string group = 5; 
+}
+
+enum MessageType {
+  DIRECT = 0;
+  BROADCAST = 1;
+  GROUP = 2;
+  REGISTERED = 3;
+}
+
+// Node register request
+message RegisterReq {
+  string node_id = 1;
+}
+
+message SubscribeReq {
+  string node_id = 1;
+  string group = 2;
+}
+
+message UnsubscribeReq {
+  string node_id = 1;
+  string group = 2;
+}
+
+message ShimToCtrl {
+  oneof payload {
+    RegisterReq register = 1;
+    Envelope outbound = 2;
+    SubscribeReq subscribe = 3;
+    UnsubscribeReq unsubscribe = 4;
+  }
+}
+
+
+// Controller -> Shim
+message CtrlToShim {
+  Envelope inbound = 1;
+}
+
+// Network Controller service
+service NetworkController {
+  rpc ControlStream(stream ShimToCtrl) returns (stream CtrlToShim);
+}
