@@ -1,7 +1,7 @@
 package controller
 
 import (
-	pb "gotest/dsnet/gotest/dsnet/proto"
+	pb "gotest/dsnet/proto"
 	"io"
 	"sync"
 )
@@ -10,6 +10,10 @@ type ControllerProps struct {
 	Logger Logger
 }
 
+/*
+* Controller handles client connections and manages message routing.
+* Will function as message broker for DSNet nodes.
+ */
 type Controller struct {
 	pb.UnimplementedNetworkControllerServer
 	mu     sync.Mutex
@@ -44,7 +48,7 @@ func (c *Controller) ControlStream(stream pb.NetworkController_ControlStreamServ
 		}
 
 		switch payload := in.Payload.(type) {
-		case *pb.ShimToCtrl_Register:
+		case *pb.ClientToController_Register:
 			nodeID = payload.Register.NodeId
 			c.mu.Lock()
 			c.nodes[nodeID] = stream
@@ -52,13 +56,13 @@ func (c *Controller) ControlStream(stream pb.NetworkController_ControlStreamServ
 			c.log.Printf("Registered node: %s", nodeID)
 			c.sendRegisteredResponse(nodeID)
 
-		case *pb.ShimToCtrl_Subscribe:
+		case *pb.ClientToController_Subscribe:
 			c.addToGroup(payload.Subscribe.NodeId, payload.Subscribe.Group)
 
-		case *pb.ShimToCtrl_Unsubscribe:
+		case *pb.ClientToController_Unsubscribe:
 			c.removeFromGroup(payload.Unsubscribe.NodeId, payload.Unsubscribe.Group)
 
-		case *pb.ShimToCtrl_Outbound:
+		case *pb.ClientToController_Outbound:
 			c.forward(payload.Outbound)
 		}
 	}
@@ -79,7 +83,7 @@ func (c *Controller) sendRegisteredResponse(nodeID string) {
 		Type:    pb.MessageType_REGISTERED,
 	}
 
-	if err := stream.Send(&pb.CtrlToShim{Inbound: resp}); err != nil {
+	if err := stream.Send(&pb.ControllerToClient{Inbound: resp}); err != nil {
 		c.log.Printf("Failed to send REGISTERED to %s: %v", nodeID, err)
 	}
 }
@@ -110,7 +114,7 @@ func (c *Controller) forward(env *pb.Envelope) {
 		defer c.mu.Unlock()
 
 		for nodeID, stream := range c.nodes {
-			if err := stream.Send(&pb.CtrlToShim{Inbound: env}); err != nil {
+			if err := stream.Send(&pb.ControllerToClient{Inbound: env}); err != nil {
 				c.log.Printf("Failed to broadcast to %s: %v", nodeID, err)
 			}
 		}
@@ -122,7 +126,7 @@ func (c *Controller) forward(env *pb.Envelope) {
 
 		for id := range members {
 			if stream, ok := c.nodes[id]; ok {
-				stream.Send(&pb.CtrlToShim{Inbound: env})
+				stream.Send(&pb.ControllerToClient{Inbound: env})
 			}
 		}
 
@@ -134,7 +138,7 @@ func (c *Controller) forward(env *pb.Envelope) {
 			c.log.Printf("Unknown destination: %s", env.To)
 			return
 		}
-		if err := dest.Send(&pb.CtrlToShim{Inbound: env}); err != nil {
+		if err := dest.Send(&pb.ControllerToClient{Inbound: env}); err != nil {
 			c.log.Printf("Failed to send to %s: %v", env.To, err)
 		} else {
 			c.log.Printf("Forwarded %s -> %s: %s", env.From, env.To, env.Payload)

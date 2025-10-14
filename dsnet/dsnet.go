@@ -6,12 +6,17 @@ import (
 	"log"
 	"sync"
 
-	pb "gotest/dsnet/gotest/dsnet/proto"
+	pb "gotest/dsnet/proto"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+/*
+* DSNet provides a simple interface for nodes to communicate via a central controller.
+* Nodes can send direct messages, broadcast messages, and publish to groups.
+* Each node maintains an inbox channel for incoming messages.
+ */
 type DSNet struct {
 	NodeID       string
 	stream       pb.NetworkController_ControlStreamClient
@@ -43,8 +48,8 @@ func ConnectWithContext(ctx context.Context, controllerAddr, nodeID string) (*DS
 	}
 
 	// Register node with controller
-	if err := stream.Send(&pb.ShimToCtrl{
-		Payload: &pb.ShimToCtrl_Register{
+	if err := stream.Send(&pb.ClientToController{
+		Payload: &pb.ClientToController_Register{
 			Register: &pb.RegisterReq{NodeId: nodeID},
 		},
 	}); err != nil {
@@ -107,8 +112,8 @@ func (d *DSNet) Broadcast(msg string) error {
 		Payload: msg,
 		Type:    pb.MessageType_BROADCAST,
 	}
-	return d.stream.Send(&pb.ShimToCtrl{
-		Payload: &pb.ShimToCtrl_Outbound{Outbound: env},
+	return d.stream.Send(&pb.ClientToController{
+		Payload: &pb.ClientToController_Outbound{Outbound: env},
 	})
 }
 
@@ -120,8 +125,8 @@ func (d *DSNet) Send(to, msg string) error {
 		Payload: msg,
 		Type:    pb.MessageType_DIRECT,
 	}
-	return d.stream.Send(&pb.ShimToCtrl{
-		Payload: &pb.ShimToCtrl_Outbound{Outbound: env},
+	return d.stream.Send(&pb.ClientToController{
+		Payload: &pb.ClientToController_Outbound{Outbound: env},
 	})
 }
 
@@ -133,15 +138,15 @@ func (d *DSNet) Publish(group, msg string) error {
 		Payload: msg,
 		Type:    pb.MessageType_GROUP,
 	}
-	return d.stream.Send(&pb.ShimToCtrl{
-		Payload: &pb.ShimToCtrl_Outbound{Outbound: env},
+	return d.stream.Send(&pb.ClientToController{
+		Payload: &pb.ClientToController_Outbound{Outbound: env},
 	})
 }
 
 // Subscribe subscribes the node to a group.
 func (d *DSNet) Subscribe(group string) error {
-	return d.stream.Send(&pb.ShimToCtrl{
-		Payload: &pb.ShimToCtrl_Subscribe{
+	return d.stream.Send(&pb.ClientToController{
+		Payload: &pb.ClientToController_Subscribe{
 			Subscribe: &pb.SubscribeReq{
 				NodeId: d.NodeID,
 				Group:  group,
@@ -152,8 +157,8 @@ func (d *DSNet) Subscribe(group string) error {
 
 // Unsubscribe unsubscribes the node from a group.
 func (d *DSNet) Unsubscribe(group string) error {
-	return d.stream.Send(&pb.ShimToCtrl{
-		Payload: &pb.ShimToCtrl_Unsubscribe{
+	return d.stream.Send(&pb.ClientToController{
+		Payload: &pb.ClientToController_Unsubscribe{
 			Unsubscribe: &pb.UnsubscribeReq{
 				NodeId: d.NodeID,
 				Group:  group,

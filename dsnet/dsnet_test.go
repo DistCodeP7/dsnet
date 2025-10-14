@@ -2,7 +2,7 @@ package dsnet
 
 import (
 	"gotest/controller"
-	gh "gotest/dsnet/gotest/dsnet/proto"
+	gh "gotest/dsnet/proto"
 	"net"
 	"sync"
 	"testing"

@@ -2,9 +2,8 @@ syntax = "proto3";
 
 package dsnet;
 
-option go_package = "gotest/dsnet/proto;dsnet";
+option go_package = "dsnet/proto;dsnet";
 
-// Message envelope
 message Envelope {
   string from = 1;
   string to = 2;
@@ -20,7 +19,6 @@ enum MessageType {
   REGISTERED = 3;
 }
 
-// Node register request
 message RegisterReq {
   string node_id = 1;
 }
@@ -35,7 +33,7 @@ message UnsubscribeReq {
   string group = 2;
 }
 
-message ShimToCtrl {
+message ClientToController {
   oneof payload {
     RegisterReq register = 1;
     Envelope outbound = 2;
@@ -44,13 +42,10 @@ message ShimToCtrl {
   }
 }
 
-
-// Controller -> Shim
-message CtrlToShim {
+message ControllerToClient {
   Envelope inbound = 1;
 }
 
-// Network Controller service
 service NetworkController {
-  rpc ControlStream(stream ShimToCtrl) returns (stream CtrlToShim);
+  rpc ControlStream(stream ClientToController) returns (stream ControllerToClient);
 }
