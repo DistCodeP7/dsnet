@@ -3,21 +3,30 @@ package controller
 import (
 	pb "gotest/dsnet/gotest/dsnet/proto"
 	"io"
-	"log"
 	"sync"
 )
+
+type ControllerProps struct {
+	Logger Logger
+}
 
 type Controller struct {
 	pb.UnimplementedNetworkControllerServer
 	mu     sync.Mutex
 	nodes  map[string]pb.NetworkController_ControlStreamServer
 	groups map[string]map[string]struct{}
+	log    Logger
 }
 
-func NewController() *Controller {
+func NewController(props ControllerProps) *Controller {
+	if props.Logger == nil {
+		props.Logger = &NoOpLogger{}
+	}
+
 	return &Controller{
 		nodes:  make(map[string]pb.NetworkController_ControlStreamServer),
 		groups: make(map[string]map[string]struct{}),
+		log:    props.Logger,
 	}
 }
 
@@ -30,7 +39,7 @@ func (c *Controller) ControlStream(stream pb.NetworkController_ControlStreamServ
 			return nil
 		}
 		if err != nil {
-			log.Printf("stream recv error: %v", err)
+			c.log.Printf("stream recv error: %v", err)
 			return err
 		}
 
@@ -40,7 +49,7 @@ func (c *Controller) ControlStream(stream pb.NetworkController_ControlStreamServ
 			c.mu.Lock()
 			c.nodes[nodeID] = stream
 			c.mu.Unlock()
-			log.Printf("Registered node: %s", nodeID)
+			c.log.Printf("Registered node: %s", nodeID)
 			c.sendRegisteredResponse(nodeID)
 
 		case *pb.ShimToCtrl_Subscribe:
@@ -60,7 +69,7 @@ func (c *Controller) sendRegisteredResponse(nodeID string) {
 	stream, ok := c.nodes[nodeID]
 	c.mu.Unlock()
 	if !ok {
-		log.Printf("sendRegisteredResponse: node %s not found", nodeID)
+		c.log.Printf("sendRegisteredResponse: node %s not found", nodeID)
 		return
 	}
 
@@ -71,7 +80,7 @@ func (c *Controller) sendRegisteredResponse(nodeID string) {
 	}
 
 	if err := stream.Send(&pb.CtrlToShim{Inbound: resp}); err != nil {
-		log.Printf("Failed to send REGISTERED to %s: %v", nodeID, err)
+		c.log.Printf("Failed to send REGISTERED to %s: %v", nodeID, err)
 	}
 }
 
@@ -82,7 +91,7 @@ func (c *Controller) addToGroup(nodeID, group string) {
 		c.groups[group] = make(map[string]struct{})
 	}
 	c.groups[group][nodeID] = struct{}{}
-	log.Printf("Node %s subscribed to group %s", nodeID, group)
+	c.log.Printf("Node %s subscribed to group %s", nodeID, group)
 }
 
 func (c *Controller) removeFromGroup(nodeID, group string) {
@@ -90,7 +99,7 @@ func (c *Controller) removeFromGroup(nodeID, group string) {
 	defer c.mu.Unlock()
 	if _, ok := c.groups[group]; ok {
 		delete(c.groups[group], nodeID)
-		log.Printf("Node %s unsubscribed from group %s", nodeID, group)
+		c.log.Printf("Node %s unsubscribed from group %s", nodeID, group)
 	}
 }
 
@@ -102,10 +111,10 @@ func (c *Controller) forward(env *pb.Envelope) {
 
 		for nodeID, stream := range c.nodes {
 			if err := stream.Send(&pb.CtrlToShim{Inbound: env}); err != nil {
-				log.Printf("Failed to broadcast to %s: %v", nodeID, err)
+				c.log.Printf("Failed to broadcast to %s: %v", nodeID, err)
 			}
 		}
-		log.Printf("Broadcasted from %s: %s", env.From, env.Payload)
+		c.log.Printf("Broadcasted from %s: %s", env.From, env.Payload)
 	case pb.MessageType_GROUP:
 		c.mu.Lock()
 		members := c.groups[env.Group]
@@ -122,13 +131,13 @@ func (c *Controller) forward(env *pb.Envelope) {
 		dest, ok := c.nodes[env.To]
 		c.mu.Unlock()
 		if !ok {
-			log.Printf("Unknown destination: %s", env.To)
+			c.log.Printf("Unknown destination: %s", env.To)
 			return
 		}
 		if err := dest.Send(&pb.CtrlToShim{Inbound: env}); err != nil {
-			log.Printf("Failed to send to %s: %v", env.To, err)
+			c.log.Printf("Failed to send to %s: %v", env.To, err)
 		} else {
-			log.Printf("Forwarded %s -> %s: %s", env.From, env.To, env.Payload)
+			c.log.Printf("Forwarded %s -> %s: %s", env.From, env.To, env.Payload)
 		}
 	}
 }

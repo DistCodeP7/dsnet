@@ -13,7 +13,7 @@ import (
 
 func startTestServer(t *testing.T) (*grpc.Server, net.Listener) {
 	grpcServer := grpc.NewServer()
-	ctrl := controller.NewController()
+	ctrl := controller.NewController(controller.ControllerProps{})
 	gh.RegisterNetworkControllerServer(grpcServer, ctrl)
 
 	lis, err := net.Listen("tcp", ":50051")
