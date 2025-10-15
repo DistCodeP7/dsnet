@@ -18,3 +18,6 @@ protoc   --go_out=proto --go_opt=paths=source_relative   --go-grpc_out=proto --g
 
 ## Dockerfile
 The Dockerfile in the repository is used to create a Docker image for workers, thus the client library will be availible for the worker to use. 
+
+## Github actions
+Both testing and production of docker iamge is done via GitHub Actions
