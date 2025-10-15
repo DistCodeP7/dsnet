@@ -2,9 +2,9 @@
 // versions:
 // 	protoc-gen-go v1.36.10
 // 	protoc        v6.32.1
-// source: dsnet/dsnet.proto
+// source: dsnet.proto
 
-package dsnet
+package proto
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -57,11 +57,11 @@ func (x MessageType) String() string {
 }
 
 func (MessageType) Descriptor() protoreflect.EnumDescriptor {
-	return file_dsnet_dsnet_proto_enumTypes[0].Descriptor()
+	return file_dsnet_proto_enumTypes[0].Descriptor()
 }
 
 func (MessageType) Type() protoreflect.EnumType {
-	return &file_dsnet_dsnet_proto_enumTypes[0]
+	return &file_dsnet_proto_enumTypes[0]
 }
 
 func (x MessageType) Number() protoreflect.EnumNumber {
@@ -70,10 +70,53 @@ func (x MessageType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use MessageType.Descriptor instead.
 func (MessageType) EnumDescriptor() ([]byte, []int) {
-	return file_dsnet_dsnet_proto_rawDescGZIP(), []int{0}
+	return file_dsnet_proto_rawDescGZIP(), []int{0}
 }
 
-// Message envelope
+type VectorClock struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Clock         map[string]uint64      `protobuf:"bytes,1,rep,name=clock,proto3" json:"clock,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *VectorClock) Reset() {
+	*x = VectorClock{}
+	mi := &file_dsnet_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VectorClock) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VectorClock) ProtoMessage() {}
+
+func (x *VectorClock) ProtoReflect() protoreflect.Message {
+	mi := &file_dsnet_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VectorClock.ProtoReflect.Descriptor instead.
+func (*VectorClock) Descriptor() ([]byte, []int) {
+	return file_dsnet_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *VectorClock) GetClock() map[string]uint64 {
+	if x != nil {
+		return x.Clock
+	}
+	return nil
+}
+
 type Envelope struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	From          string                 `protobuf:"bytes,1,opt,name=from,proto3" json:"from,omitempty"`
@@ -81,13 +124,15 @@ type Envelope struct {
 	Payload       string                 `protobuf:"bytes,3,opt,name=payload,proto3" json:"payload,omitempty"`
 	Type          MessageType            `protobuf:"varint,4,opt,name=type,proto3,enum=dsnet.MessageType" json:"type,omitempty"`
 	Group         string                 `protobuf:"bytes,5,opt,name=group,proto3" json:"group,omitempty"`
+	Seq           uint64                 `protobuf:"varint,6,opt,name=seq,proto3" json:"seq,omitempty"`
+	Vclock        *VectorClock           `protobuf:"bytes,7,opt,name=vclock,proto3" json:"vclock,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Envelope) Reset() {
 	*x = Envelope{}
-	mi := &file_dsnet_dsnet_proto_msgTypes[0]
+	mi := &file_dsnet_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -99,7 +144,7 @@ func (x *Envelope) String() string {
 func (*Envelope) ProtoMessage() {}
 
 func (x *Envelope) ProtoReflect() protoreflect.Message {
-	mi := &file_dsnet_dsnet_proto_msgTypes[0]
+	mi := &file_dsnet_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -112,7 +157,7 @@ func (x *Envelope) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Envelope.ProtoReflect.Descriptor instead.
 func (*Envelope) Descriptor() ([]byte, []int) {
-	return file_dsnet_dsnet_proto_rawDescGZIP(), []int{0}
+	return file_dsnet_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *Envelope) GetFrom() string {
@@ -150,7 +195,20 @@ func (x *Envelope) GetGroup() string {
 	return ""
 }
 
-// Node register request
+func (x *Envelope) GetSeq() uint64 {
+	if x != nil {
+		return x.Seq
+	}
+	return 0
+}
+
+func (x *Envelope) GetVclock() *VectorClock {
+	if x != nil {
+		return x.Vclock
+	}
+	return nil
+}
+
 type RegisterReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	NodeId        string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
@@ -160,7 +218,7 @@ type RegisterReq struct {
 
 func (x *RegisterReq) Reset() {
 	*x = RegisterReq{}
-	mi := &file_dsnet_dsnet_proto_msgTypes[1]
+	mi := &file_dsnet_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -172,7 +230,7 @@ func (x *RegisterReq) String() string {
 func (*RegisterReq) ProtoMessage() {}
 
 func (x *RegisterReq) ProtoReflect() protoreflect.Message {
-	mi := &file_dsnet_dsnet_proto_msgTypes[1]
+	mi := &file_dsnet_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -185,7 +243,7 @@ func (x *RegisterReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterReq.ProtoReflect.Descriptor instead.
 func (*RegisterReq) Descriptor() ([]byte, []int) {
-	return file_dsnet_dsnet_proto_rawDescGZIP(), []int{1}
+	return file_dsnet_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *RegisterReq) GetNodeId() string {
@@ -205,7 +263,7 @@ type SubscribeReq struct {
 
 func (x *SubscribeReq) Reset() {
 	*x = SubscribeReq{}
-	mi := &file_dsnet_dsnet_proto_msgTypes[2]
+	mi := &file_dsnet_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -217,7 +275,7 @@ func (x *SubscribeReq) String() string {
 func (*SubscribeReq) ProtoMessage() {}
 
 func (x *SubscribeReq) ProtoReflect() protoreflect.Message {
-	mi := &file_dsnet_dsnet_proto_msgTypes[2]
+	mi := &file_dsnet_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -230,7 +288,7 @@ func (x *SubscribeReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeReq.ProtoReflect.Descriptor instead.
 func (*SubscribeReq) Descriptor() ([]byte, []int) {
-	return file_dsnet_dsnet_proto_rawDescGZIP(), []int{2}
+	return file_dsnet_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *SubscribeReq) GetNodeId() string {
@@ -257,7 +315,7 @@ type UnsubscribeReq struct {
 
 func (x *UnsubscribeReq) Reset() {
 	*x = UnsubscribeReq{}
-	mi := &file_dsnet_dsnet_proto_msgTypes[3]
+	mi := &file_dsnet_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -269,7 +327,7 @@ func (x *UnsubscribeReq) String() string {
 func (*UnsubscribeReq) ProtoMessage() {}
 
 func (x *UnsubscribeReq) ProtoReflect() protoreflect.Message {
-	mi := &file_dsnet_dsnet_proto_msgTypes[3]
+	mi := &file_dsnet_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -282,7 +340,7 @@ func (x *UnsubscribeReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnsubscribeReq.ProtoReflect.Descriptor instead.
 func (*UnsubscribeReq) Descriptor() ([]byte, []int) {
-	return file_dsnet_dsnet_proto_rawDescGZIP(), []int{3}
+	return file_dsnet_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *UnsubscribeReq) GetNodeId() string {
@@ -314,7 +372,7 @@ type ClientToController struct {
 
 func (x *ClientToController) Reset() {
 	*x = ClientToController{}
-	mi := &file_dsnet_dsnet_proto_msgTypes[4]
+	mi := &file_dsnet_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -326,7 +384,7 @@ func (x *ClientToController) String() string {
 func (*ClientToController) ProtoMessage() {}
 
 func (x *ClientToController) ProtoReflect() protoreflect.Message {
-	mi := &file_dsnet_dsnet_proto_msgTypes[4]
+	mi := &file_dsnet_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -339,7 +397,7 @@ func (x *ClientToController) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClientToController.ProtoReflect.Descriptor instead.
 func (*ClientToController) Descriptor() ([]byte, []int) {
-	return file_dsnet_dsnet_proto_rawDescGZIP(), []int{4}
+	return file_dsnet_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ClientToController) GetPayload() isClientToController_Payload {
@@ -422,7 +480,7 @@ type ControllerToClient struct {
 
 func (x *ControllerToClient) Reset() {
 	*x = ControllerToClient{}
-	mi := &file_dsnet_dsnet_proto_msgTypes[5]
+	mi := &file_dsnet_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -434,7 +492,7 @@ func (x *ControllerToClient) String() string {
 func (*ControllerToClient) ProtoMessage() {}
 
 func (x *ControllerToClient) ProtoReflect() protoreflect.Message {
-	mi := &file_dsnet_dsnet_proto_msgTypes[5]
+	mi := &file_dsnet_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -447,7 +505,7 @@ func (x *ControllerToClient) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ControllerToClient.ProtoReflect.Descriptor instead.
 func (*ControllerToClient) Descriptor() ([]byte, []int) {
-	return file_dsnet_dsnet_proto_rawDescGZIP(), []int{5}
+	return file_dsnet_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ControllerToClient) GetInbound() *Envelope {
@@ -457,17 +515,25 @@ func (x *ControllerToClient) GetInbound() *Envelope {
 	return nil
 }
 
-var File_dsnet_dsnet_proto protoreflect.FileDescriptor
+var File_dsnet_proto protoreflect.FileDescriptor
 
-const file_dsnet_dsnet_proto_rawDesc = "" +
+const file_dsnet_proto_rawDesc = "" +
 	"\n" +
-	"\x11dsnet/dsnet.proto\x12\x05dsnet\"\x86\x01\n" +
+	"\vdsnet.proto\x12\x05dsnet\"|\n" +
+	"\vVectorClock\x123\n" +
+	"\x05clock\x18\x01 \x03(\v2\x1d.dsnet.VectorClock.ClockEntryR\x05clock\x1a8\n" +
+	"\n" +
+	"ClockEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x04R\x05value:\x028\x01\"\xc4\x01\n" +
 	"\bEnvelope\x12\x12\n" +
 	"\x04from\x18\x01 \x01(\tR\x04from\x12\x0e\n" +
 	"\x02to\x18\x02 \x01(\tR\x02to\x12\x18\n" +
 	"\apayload\x18\x03 \x01(\tR\apayload\x12&\n" +
 	"\x04type\x18\x04 \x01(\x0e2\x12.dsnet.MessageTypeR\x04type\x12\x14\n" +
-	"\x05group\x18\x05 \x01(\tR\x05group\"&\n" +
+	"\x05group\x18\x05 \x01(\tR\x05group\x12\x10\n" +
+	"\x03seq\x18\x06 \x01(\x04R\x03seq\x12*\n" +
+	"\x06vclock\x18\a \x01(\v2\x12.dsnet.VectorClockR\x06vclock\"&\n" +
 	"\vRegisterReq\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\"=\n" +
 	"\fSubscribeReq\x12\x17\n" +
@@ -492,53 +558,57 @@ const file_dsnet_dsnet_proto_rawDesc = "" +
 	"\n" +
 	"REGISTERED\x10\x032^\n" +
 	"\x11NetworkController\x12I\n" +
-	"\rControlStream\x12\x19.dsnet.ClientToController\x1a\x19.dsnet.ControllerToClient(\x010\x01B\x13Z\x11dsnet/proto;dsnetb\x06proto3"
+	"\rControlStream\x12\x19.dsnet.ClientToController\x1a\x19.dsnet.ControllerToClient(\x010\x01B\x13Z\x11dsnet/proto;protob\x06proto3"
 
 var (
-	file_dsnet_dsnet_proto_rawDescOnce sync.Once
-	file_dsnet_dsnet_proto_rawDescData []byte
+	file_dsnet_proto_rawDescOnce sync.Once
+	file_dsnet_proto_rawDescData []byte
 )
 
-func file_dsnet_dsnet_proto_rawDescGZIP() []byte {
-	file_dsnet_dsnet_proto_rawDescOnce.Do(func() {
-		file_dsnet_dsnet_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_dsnet_dsnet_proto_rawDesc), len(file_dsnet_dsnet_proto_rawDesc)))
+func file_dsnet_proto_rawDescGZIP() []byte {
+	file_dsnet_proto_rawDescOnce.Do(func() {
+		file_dsnet_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_dsnet_proto_rawDesc), len(file_dsnet_proto_rawDesc)))
 	})
-	return file_dsnet_dsnet_proto_rawDescData
+	return file_dsnet_proto_rawDescData
 }
 
-var file_dsnet_dsnet_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_dsnet_dsnet_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
-var file_dsnet_dsnet_proto_goTypes = []any{
+var file_dsnet_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_dsnet_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_dsnet_proto_goTypes = []any{
 	(MessageType)(0),           // 0: dsnet.MessageType
-	(*Envelope)(nil),           // 1: dsnet.Envelope
-	(*RegisterReq)(nil),        // 2: dsnet.RegisterReq
-	(*SubscribeReq)(nil),       // 3: dsnet.SubscribeReq
-	(*UnsubscribeReq)(nil),     // 4: dsnet.UnsubscribeReq
-	(*ClientToController)(nil), // 5: dsnet.ClientToController
-	(*ControllerToClient)(nil), // 6: dsnet.ControllerToClient
+	(*VectorClock)(nil),        // 1: dsnet.VectorClock
+	(*Envelope)(nil),           // 2: dsnet.Envelope
+	(*RegisterReq)(nil),        // 3: dsnet.RegisterReq
+	(*SubscribeReq)(nil),       // 4: dsnet.SubscribeReq
+	(*UnsubscribeReq)(nil),     // 5: dsnet.UnsubscribeReq
+	(*ClientToController)(nil), // 6: dsnet.ClientToController
+	(*ControllerToClient)(nil), // 7: dsnet.ControllerToClient
+	nil,                        // 8: dsnet.VectorClock.ClockEntry
 }
-var file_dsnet_dsnet_proto_depIdxs = []int32{
-	0, // 0: dsnet.Envelope.type:type_name -> dsnet.MessageType
-	2, // 1: dsnet.ClientToController.register:type_name -> dsnet.RegisterReq
-	1, // 2: dsnet.ClientToController.outbound:type_name -> dsnet.Envelope
-	3, // 3: dsnet.ClientToController.subscribe:type_name -> dsnet.SubscribeReq
-	4, // 4: dsnet.ClientToController.unsubscribe:type_name -> dsnet.UnsubscribeReq
-	1, // 5: dsnet.ControllerToClient.inbound:type_name -> dsnet.Envelope
-	5, // 6: dsnet.NetworkController.ControlStream:input_type -> dsnet.ClientToController
-	6, // 7: dsnet.NetworkController.ControlStream:output_type -> dsnet.ControllerToClient
-	7, // [7:8] is the sub-list for method output_type
-	6, // [6:7] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+var file_dsnet_proto_depIdxs = []int32{
+	8, // 0: dsnet.VectorClock.clock:type_name -> dsnet.VectorClock.ClockEntry
+	0, // 1: dsnet.Envelope.type:type_name -> dsnet.MessageType
+	1, // 2: dsnet.Envelope.vclock:type_name -> dsnet.VectorClock
+	3, // 3: dsnet.ClientToController.register:type_name -> dsnet.RegisterReq
+	2, // 4: dsnet.ClientToController.outbound:type_name -> dsnet.Envelope
+	4, // 5: dsnet.ClientToController.subscribe:type_name -> dsnet.SubscribeReq
+	5, // 6: dsnet.ClientToController.unsubscribe:type_name -> dsnet.UnsubscribeReq
+	2, // 7: dsnet.ControllerToClient.inbound:type_name -> dsnet.Envelope
+	6, // 8: dsnet.NetworkController.ControlStream:input_type -> dsnet.ClientToController
+	7, // 9: dsnet.NetworkController.ControlStream:output_type -> dsnet.ControllerToClient
+	9, // [9:10] is the sub-list for method output_type
+	8, // [8:9] is the sub-list for method input_type
+	8, // [8:8] is the sub-list for extension type_name
+	8, // [8:8] is the sub-list for extension extendee
+	0, // [0:8] is the sub-list for field type_name
 }
 
-func init() { file_dsnet_dsnet_proto_init() }
-func file_dsnet_dsnet_proto_init() {
-	if File_dsnet_dsnet_proto != nil {
+func init() { file_dsnet_proto_init() }
+func file_dsnet_proto_init() {
+	if File_dsnet_proto != nil {
 		return
 	}
-	file_dsnet_dsnet_proto_msgTypes[4].OneofWrappers = []any{
+	file_dsnet_proto_msgTypes[5].OneofWrappers = []any{
 		(*ClientToController_Register)(nil),
 		(*ClientToController_Outbound)(nil),
 		(*ClientToController_Subscribe)(nil),
@@ -548,18 +618,18 @@ func file_dsnet_dsnet_proto_init() {
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_dsnet_dsnet_proto_rawDesc), len(file_dsnet_dsnet_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_dsnet_proto_rawDesc), len(file_dsnet_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   6,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_dsnet_dsnet_proto_goTypes,
-		DependencyIndexes: file_dsnet_dsnet_proto_depIdxs,
-		EnumInfos:         file_dsnet_dsnet_proto_enumTypes,
-		MessageInfos:      file_dsnet_dsnet_proto_msgTypes,
+		GoTypes:           file_dsnet_proto_goTypes,
+		DependencyIndexes: file_dsnet_proto_depIdxs,
+		EnumInfos:         file_dsnet_proto_enumTypes,
+		MessageInfos:      file_dsnet_proto_msgTypes,
 	}.Build()
-	File_dsnet_dsnet_proto = out.File
-	file_dsnet_dsnet_proto_goTypes = nil
-	file_dsnet_dsnet_proto_depIdxs = nil
+	File_dsnet_proto = out.File
+	file_dsnet_proto_goTypes = nil
+	file_dsnet_proto_depIdxs = nil
 }

@@ -2,7 +2,11 @@ syntax = "proto3";
 
 package dsnet;
 
-option go_package = "dsnet/proto;dsnet";
+option go_package = "dsnet/proto;proto";
+
+message VectorClock {
+  map<string, uint64> clock = 1;
+}
 
 message Envelope {
   string from = 1;
@@ -10,6 +14,8 @@ message Envelope {
   string payload = 3;
   MessageType type = 4;
   string group = 5; 
+  uint64 seq = 6;
+  VectorClock vclock = 7;
 }
 
 enum MessageType {

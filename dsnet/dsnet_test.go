@@ -1,12 +1,13 @@
 package dsnet
 
 import (
-	"gotest/controller"
-	gh "gotest/dsnet/proto"
 	"net"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/distcode/dsnet/controller"
+	gh "github.com/distcode/dsnet/proto"
 
 	"google.golang.org/grpc"
 )

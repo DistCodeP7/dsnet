@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v6.32.1
-// source: dsnet/dsnet.proto
+// source: dsnet.proto
 
-package dsnet
+package proto
 
 import (
 	context "context"
@@ -25,8 +25,6 @@ const (
 // NetworkControllerClient is the client API for NetworkController service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-//
-// Network Controller service
 type NetworkControllerClient interface {
 	ControlStream(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ClientToController, ControllerToClient], error)
 }
@@ -55,8 +53,6 @@ type NetworkController_ControlStreamClient = grpc.BidiStreamingClient[ClientToCo
 // NetworkControllerServer is the server API for NetworkController service.
 // All implementations must embed UnimplementedNetworkControllerServer
 // for forward compatibility.
-//
-// Network Controller service
 type NetworkControllerServer interface {
 	ControlStream(grpc.BidiStreamingServer[ClientToController, ControllerToClient]) error
 	mustEmbedUnimplementedNetworkControllerServer()
@@ -115,5 +111,5 @@ var NetworkController_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "dsnet/dsnet.proto",
+	Metadata: "dsnet.proto",
 }

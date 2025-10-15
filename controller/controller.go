@@ -1,9 +1,10 @@
 package controller
 
 import (
-	pb "gotest/dsnet/proto"
 	"io"
 	"sync"
+
+	pb "github.com/distcode/dsnet/proto"
 )
 
 type ControllerProps struct {

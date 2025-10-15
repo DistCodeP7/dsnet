@@ -6,7 +6,7 @@ import (
 	"log"
 	"sync"
 
-	pb "gotest/dsnet/proto"
+	pb "github.com/distcode/dsnet/proto"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -23,6 +23,8 @@ type DSNet struct {
 	Inbox        chan *pb.Envelope
 	RegisteredCh chan struct{}
 	closeCh      chan struct{}
+	vclock       pb.VectorClock
+	seq          uint64
 	closeOnce    sync.Once
 }
 
@@ -45,6 +47,10 @@ func ConnectWithContext(ctx context.Context, controllerAddr, nodeID string) (*DS
 		Inbox:        make(chan *pb.Envelope, 100),
 		RegisteredCh: make(chan struct{}),
 		closeCh:      make(chan struct{}),
+		vclock: pb.VectorClock{
+			Clock: make(map[string]uint64),
+		},
+		seq: 0,
 	}
 
 	// Register node with controller
