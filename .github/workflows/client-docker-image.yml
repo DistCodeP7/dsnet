@@ -32,5 +32,5 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/distcodep7/app:latest
-            ghcr.io/distcodep7/app:${{ github.sha }}
+            ghcr.io/distcodep7/dsnet:latest
+            ghcr.io/distcodep7/dsnet:${{ github.sha }}
