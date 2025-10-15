@@ -1,9 +1,8 @@
 name: ci
 
 on:
-  push:
-    branches:
-      - main
+  pull_request:
+    branches: "main"
 
 jobs:
   docker:
@@ -17,7 +16,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.GHCR_PAT }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
