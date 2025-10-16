@@ -29,7 +29,8 @@ type DSNet struct {
 }
 
 // ConnectWithContext connects a node to the controller with a context.
-func ConnectWithContext(ctx context.Context, controllerAddr, nodeID string) (*DSNet, error) {
+func ConnectWithContext(ctx context.Context, nodeID string) (*DSNet, error) {
+	controllerAddr := "localhost:50051" // Default controller address; can be parameterized as needed.
 	clientConn, err := grpc.NewClient(controllerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, err
@@ -73,8 +74,8 @@ func ConnectWithContext(ctx context.Context, controllerAddr, nodeID string) (*DS
 	return ds, nil
 }
 
-func Connect(controllerAddr, nodeID string) (*DSNet, error) {
-	return ConnectWithContext(context.Background(), controllerAddr, nodeID)
+func Connect(nodeID string) (*DSNet, error) {
+	return ConnectWithContext(context.Background(), nodeID)
 }
 
 func (d *DSNet) Close() error {

@@ -47,11 +47,11 @@ func TestClientMessaging(t *testing.T) {
 		lis.Close()
 	}()
 
-	nodeA, err := Connect("localhost:50051", "nodeA")
+	nodeA, err := Connect("nodeA")
 	if err != nil {
 		t.Fatalf("Failed to connect nodeA: %v", err)
 	}
-	nodeB, err := Connect("localhost:50051", "nodeB")
+	nodeB, err := Connect("nodeB")
 	if err != nil {
 		t.Fatalf("Failed to connect nodeB: %v", err)
 	}
@@ -89,11 +89,11 @@ func TestBroadcastingMessage(t *testing.T) {
 		lis.Close()
 	}()
 
-	nodeA, err := Connect("localhost:50051", "nodeA")
+	nodeA, err := Connect("nodeA")
 	if err != nil {
 		t.Fatalf("Failed to connect nodeA: %v", err)
 	}
-	nodeB, err := Connect("localhost:50051", "nodeB")
+	nodeB, err := Connect("nodeB")
 	if err != nil {
 		t.Fatalf("Failed to connect nodeB: %v", err)
 	}
@@ -129,15 +129,15 @@ func TestBroadcastingMessageThreeNodes(t *testing.T) {
 	}()
 
 	// Connect three nodes
-	nodeA, err := Connect("localhost:50051", "nodeA")
+	nodeA, err := Connect("nodeA")
 	if err != nil {
 		t.Fatalf("Failed to connect nodeA: %v", err)
 	}
-	nodeB, err := Connect("localhost:50051", "nodeB")
+	nodeB, err := Connect("nodeB")
 	if err != nil {
 		t.Fatalf("Failed to connect nodeB: %v", err)
 	}
-	nodeC, err := Connect("localhost:50051", "nodeC")
+	nodeC, err := Connect("nodeC")
 	if err != nil {
 		t.Fatalf("Failed to connect nodeC: %v", err)
 	}
@@ -210,9 +210,9 @@ func TestGroupMessagingConcurrent(t *testing.T) {
 	}()
 
 	// Connect three nodes
-	nodeA, _ := Connect("localhost:50051", "nodeA")
-	nodeB, _ := Connect("localhost:50051", "nodeB")
-	nodeC, _ := Connect("localhost:50051", "nodeC")
+	nodeA, _ := Connect("nodeA")
+	nodeB, _ := Connect("nodeB")
+	nodeC, _ := Connect("nodeC")
 	defer nodeA.Close()
 	defer nodeB.Close()
 	defer nodeC.Close()
