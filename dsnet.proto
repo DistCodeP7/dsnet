@@ -1,33 +1,39 @@
+
 syntax = "proto3";
 
 package dsnet;
 
 option go_package = "dsnet/proto;proto";
+import "google/protobuf/struct.proto";
 
-message VectorClock {
-  map<string, uint64> clock = 1;
+/*
+ * N = Client never fills this value
+ * O = Client can fill this value (Optional)
+ * C = Client always fills this value
+ */
+
+// O defaults to DIRECT
+enum DeliveryType {
+  DIRECT = 0; // default value if not set
+  BROADCAST = 1;
+  GROUP = 2;
 }
+
+message VClock { map<string, uint64> vclock = 1; }
 
 message Envelope {
   string from = 1;
   string to = 2;
-  string payload = 3;
-  MessageType type = 4;
-  string group = 5; 
-  uint64 seq = 6;
-  VectorClock vclock = 7;
+  google.protobuf.Struct payload = 3;
+  DeliveryType delivery_type = 4;
+  string group = 5;
+  string operation = 6;
+  uint64 seq = 7;
+  VClock vclock = 8;
 }
 
-enum MessageType {
-  DIRECT = 0;
-  BROADCAST = 1;
-  GROUP = 2;
-  REGISTERED = 3;
-}
-
-message RegisterReq {
-  string node_id = 1;
-}
+message RegisterReq { string node_id = 1; }
+message RegisterResp {}
 
 message SubscribeReq {
   string node_id = 1;
@@ -42,16 +48,20 @@ message UnsubscribeReq {
 message ClientToController {
   oneof payload {
     RegisterReq register = 1;
-    Envelope outbound = 2;
+    Envelope send = 2;
     SubscribeReq subscribe = 3;
     UnsubscribeReq unsubscribe = 4;
   }
 }
 
-message ControllerToClient {
-  Envelope inbound = 1;
+message ControllerToClient { 
+  oneof payload {
+    RegisterResp register = 1;
+    Envelope forward = 2;
+  }
 }
 
 service NetworkController {
-  rpc ControlStream(stream ClientToController) returns (stream ControllerToClient);
+  rpc ControlStream(stream ClientToController)
+      returns (stream ControllerToClient);
 }

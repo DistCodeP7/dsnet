@@ -10,6 +10,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	structpb "google.golang.org/protobuf/types/known/structpb"
 )
 
 /*
@@ -18,18 +19,22 @@ import (
 * Each node maintains an inbox channel for incoming messages.
  */
 type DSNet struct {
-	NodeID       string
+	nodeId       string
 	stream       pb.NetworkController_ControlStreamClient
 	Inbox        chan *pb.Envelope
-	RegisteredCh chan struct{}
+	registeredCh chan struct{}
 	closeCh      chan struct{}
-	vclock       pb.VectorClock
+	vclock       *pb.VClock
 	seq          uint64
 	closeOnce    sync.Once
 }
 
+func (d *DSNet) GetNodeID() string {
+	return d.nodeId
+}
+
 // ConnectWithContext connects a node to the controller with a context.
-func ConnectWithContext(ctx context.Context, controllerAddr, nodeID string) (*DSNet, error) {
+func ConnectWithContext(ctx context.Context, controllerAddr, nodeId string) (*DSNet, error) {
 	clientConn, err := grpc.NewClient(controllerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, err
@@ -42,13 +47,13 @@ func ConnectWithContext(ctx context.Context, controllerAddr, nodeID string) (*DS
 	}
 
 	ds := &DSNet{
-		NodeID:       nodeID,
+		nodeId:       nodeId,
 		stream:       stream,
 		Inbox:        make(chan *pb.Envelope, 100),
-		RegisteredCh: make(chan struct{}),
+		registeredCh: make(chan struct{}),
 		closeCh:      make(chan struct{}),
-		vclock: pb.VectorClock{
-			Clock: make(map[string]uint64),
+		vclock: &pb.VClock{
+			Vclock: make(map[string]uint64),
 		},
 		seq: 0,
 	}
@@ -56,7 +61,7 @@ func ConnectWithContext(ctx context.Context, controllerAddr, nodeID string) (*DS
 	// Register node with controller
 	if err := stream.Send(&pb.ClientToController{
 		Payload: &pb.ClientToController_Register{
-			Register: &pb.RegisterReq{NodeId: nodeID},
+			Register: &pb.RegisterReq{NodeId: nodeId},
 		},
 	}); err != nil {
 		return nil, err
@@ -65,7 +70,7 @@ func ConnectWithContext(ctx context.Context, controllerAddr, nodeID string) (*DS
 	go ds.listen()
 
 	select {
-	case <-ds.RegisteredCh:
+	case <-ds.registeredCh:
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
@@ -93,59 +98,94 @@ func (d *DSNet) listen() {
 		default:
 			in, err := d.stream.Recv()
 			if err == io.EOF {
+				log.Printf("[%s] stream closed by server", d.nodeId)
 				return
 			}
 			if err != nil {
-				log.Printf("[%s] receive error: %v", d.NodeID, err)
+				log.Printf("[%s] receive error: %v", d.nodeId, err)
 				continue
 			}
-			if in.Inbound != nil && in.Inbound.Type == pb.MessageType_REGISTERED {
+
+			switch payload := in.Payload.(type) {
+			case *pb.ControllerToClient_Register:
 				select {
-				case d.RegisteredCh <- struct{}{}:
+				case d.registeredCh <- struct{}{}:
 				default:
 				}
-				continue
+
+			case *pb.ControllerToClient_Forward:
+				d.Inbox <- payload.Forward
+
+			default:
+				log.Printf("[%s] unknown payload type received: %T", d.nodeId, payload)
 			}
-			d.Inbox <- in.Inbound
 		}
 	}
 }
 
+// helper to wrap a generic payload in structpb
+func toStructPB(data map[string]interface{}) (*structpb.Struct, error) {
+	return structpb.NewStruct(data)
+}
+
 // Broadcast sends a message to all nodes.
-func (d *DSNet) Broadcast(msg string) error {
-	env := &pb.Envelope{
-		From:    d.NodeID,
-		Payload: msg,
-		Type:    pb.MessageType_BROADCAST,
+func (d *DSNet) Broadcast(payload map[string]interface{}, operation string) error {
+	structPayload, err := toStructPB(payload)
+	if err != nil {
+		return err
 	}
+	env := &pb.Envelope{
+		From:         d.nodeId,
+		Payload:      structPayload,
+		DeliveryType: pb.DeliveryType_BROADCAST,
+		Operation:    operation,
+		Seq:          d.seq,
+	}
+	d.seq++
 	return d.stream.Send(&pb.ClientToController{
-		Payload: &pb.ClientToController_Outbound{Outbound: env},
+		Payload: &pb.ClientToController_Send{Send: env},
 	})
 }
 
 // Send sends a direct message to a single node.
-func (d *DSNet) Send(to, msg string) error {
-	env := &pb.Envelope{
-		From:    d.NodeID,
-		To:      to,
-		Payload: msg,
-		Type:    pb.MessageType_DIRECT,
+func (d *DSNet) Send(to string, payload map[string]interface{}, operation string) error {
+	structPayload, err := toStructPB(payload)
+	if err != nil {
+		return err
 	}
+	env := &pb.Envelope{
+		From:         d.nodeId,
+		To:           to,
+		Payload:      structPayload,
+		DeliveryType: pb.DeliveryType_DIRECT,
+		Operation:    operation,
+		Seq:          d.seq,
+	}
+	d.seq++
 	return d.stream.Send(&pb.ClientToController{
-		Payload: &pb.ClientToController_Outbound{Outbound: env},
+		Payload: &pb.ClientToController_Send{Send: env},
 	})
 }
 
 // Publish sends a message to a group.
-func (d *DSNet) Publish(group, msg string) error {
-	env := &pb.Envelope{
-		From:    d.NodeID,
-		Group:   group,
-		Payload: msg,
-		Type:    pb.MessageType_GROUP,
+func (d *DSNet) Publish(group string, payload map[string]interface{}, operation string) error {
+	structPayload, err := toStructPB(payload)
+	if err != nil {
+		return err
 	}
+	env := &pb.Envelope{
+		From:         d.nodeId,
+		Group:        group,
+		Payload:      structPayload,
+		DeliveryType: pb.DeliveryType_GROUP,
+		Operation:    operation,
+		Seq:          d.seq,
+	}
+	d.seq++
 	return d.stream.Send(&pb.ClientToController{
-		Payload: &pb.ClientToController_Outbound{Outbound: env},
+		Payload: &pb.ClientToController_Send{
+			Send: env,
+		},
 	})
 }
 
@@ -154,7 +194,7 @@ func (d *DSNet) Subscribe(group string) error {
 	return d.stream.Send(&pb.ClientToController{
 		Payload: &pb.ClientToController_Subscribe{
 			Subscribe: &pb.SubscribeReq{
-				NodeId: d.NodeID,
+				NodeId: d.nodeId,
 				Group:  group,
 			},
 		},
@@ -166,7 +206,7 @@ func (d *DSNet) Unsubscribe(group string) error {
 	return d.stream.Send(&pb.ClientToController{
 		Payload: &pb.ClientToController_Unsubscribe{
 			Unsubscribe: &pb.UnsubscribeReq{
-				NodeId: d.NodeID,
+				NodeId: d.nodeId,
 				Group:  group,
 			},
 		},

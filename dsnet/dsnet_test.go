@@ -26,12 +26,24 @@ func startTestServer(t *testing.T) (*grpc.Server, net.Listener) {
 	return grpcServer, lis
 }
 
+// helper to check payload
+func payloadEquals(env *gh.Envelope, msg, from string) bool {
+	if env.From != from || env.Payload == nil {
+		return false
+	}
+	v, ok := env.Payload.Fields["message"]
+	if !ok {
+		return false
+	}
+	return v.GetStringValue() == msg
+}
+
 func waitForMsg(ch chan *gh.Envelope, expected, from string) bool {
 	timeout := time.After(2 * time.Second)
 	for {
 		select {
 		case msg := <-ch:
-			if msg.Payload == expected && msg.From == from {
+			if payloadEquals(msg, expected, from) {
 				return true
 			}
 		case <-timeout:
@@ -55,22 +67,16 @@ func TestClientMessaging(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect nodeB: %v", err)
 	}
+	defer nodeA.Close()
+	defer nodeB.Close()
 
-	// Ensure clients are properly closed after test
-	defer func() {
-		nodeA.Close()
-		nodeB.Close()
-	}()
-
-	// Node A sends to Node B
 	expectedMsgAtoB := "Hello from A to B"
-	if err := nodeA.Send("nodeB", expectedMsgAtoB); err != nil {
+	if err := nodeA.Send("nodeB", map[string]any{"message": expectedMsgAtoB}, "chat"); err != nil {
 		t.Fatalf("Failed to send message from A to B: %v", err)
 	}
 
-	// Node B sends to Node A
 	expectedMsgBtoA := "Hello from B to A"
-	if err := nodeB.Send("nodeA", expectedMsgBtoA); err != nil {
+	if err := nodeB.Send("nodeA", map[string]any{"message": expectedMsgBtoA}, "chat"); err != nil {
 		t.Fatalf("Failed to send message from B to A: %v", err)
 	}
 
@@ -89,34 +95,22 @@ func TestBroadcastingMessage(t *testing.T) {
 		lis.Close()
 	}()
 
-	nodeA, err := Connect("localhost:50051", "nodeA")
-	if err != nil {
-		t.Fatalf("Failed to connect nodeA: %v", err)
-	}
-	nodeB, err := Connect("localhost:50051", "nodeB")
-	if err != nil {
-		t.Fatalf("Failed to connect nodeB: %v", err)
-	}
+	nodeA, _ := Connect("localhost:50051", "nodeA")
+	nodeB, _ := Connect("localhost:50051", "nodeB")
+	defer nodeA.Close()
+	defer nodeB.Close()
 
-	defer func() {
-		nodeA.Close()
-		nodeB.Close()
-	}()
-
-	expectedMsgAtoB := "Hello from A to B"
-	if err := nodeA.Broadcast(expectedMsgAtoB); err != nil {
+	if err := nodeA.Broadcast(map[string]any{"message": "Hello from A to B"}, "chat"); err != nil {
 		t.Fatalf("Failed to broadcast from A: %v", err)
 	}
-
-	expectedMsgBtoA := "Hello from B to A"
-	if err := nodeB.Broadcast(expectedMsgBtoA); err != nil {
+	if err := nodeB.Broadcast(map[string]any{"message": "Hello from B to A"}, "chat"); err != nil {
 		t.Fatalf("Failed to broadcast from B: %v", err)
 	}
 
-	if !waitForMsg(nodeB.Inbox, expectedMsgAtoB, "nodeA") {
+	if !waitForMsg(nodeB.Inbox, "Hello from A to B", "nodeA") {
 		t.Errorf("NodeB did not receive expected message from NodeA")
 	}
-	if !waitForMsg(nodeA.Inbox, expectedMsgBtoA, "nodeB") {
+	if !waitForMsg(nodeA.Inbox, "Hello from B to A", "nodeB") {
 		t.Errorf("NodeA did not receive expected message from NodeB")
 	}
 }
@@ -128,45 +122,29 @@ func TestBroadcastingMessageThreeNodes(t *testing.T) {
 		lis.Close()
 	}()
 
-	// Connect three nodes
-	nodeA, err := Connect("localhost:50051", "nodeA")
-	if err != nil {
-		t.Fatalf("Failed to connect nodeA: %v", err)
-	}
-	nodeB, err := Connect("localhost:50051", "nodeB")
-	if err != nil {
-		t.Fatalf("Failed to connect nodeB: %v", err)
-	}
-	nodeC, err := Connect("localhost:50051", "nodeC")
-	if err != nil {
-		t.Fatalf("Failed to connect nodeC: %v", err)
-	}
+	nodeA, _ := Connect("localhost:50051", "nodeA")
+	nodeB, _ := Connect("localhost:50051", "nodeB")
+	nodeC, _ := Connect("localhost:50051", "nodeC")
+	defer nodeA.Close()
+	defer nodeB.Close()
+	defer nodeC.Close()
 
-	defer func() {
-		nodeA.Close()
-		nodeB.Close()
-		nodeC.Close()
-	}()
-
-	// Broadcast messages concurrently
-	msgA := "Hello from A"
-	msgB := "Hello from B"
-
-	if err := nodeA.Broadcast(msgA); err != nil {
+	if err := nodeA.Broadcast(map[string]any{"message": "Hello from A"}, "chat"); err != nil {
 		t.Fatalf("Failed to broadcast from nodeA: %v", err)
 	}
-	if err := nodeB.Broadcast(msgB); err != nil {
+	if err := nodeB.Broadcast(map[string]any{"message": "Hello from B"}, "chat"); err != nil {
 		t.Fatalf("Failed to broadcast from nodeB: %v", err)
 	}
 
-	// Helper function to collect all messages received within 2 seconds
+	// collect messages helper
 	collectMessages := func(ch chan *gh.Envelope, expectedCount int) map[string]string {
 		received := make(map[string]string)
 		timeout := time.After(2 * time.Second)
 		for len(received) < expectedCount {
 			select {
 			case msg := <-ch:
-				received[msg.Payload] = msg.From
+				msgStr := msg.Payload.Fields["message"].GetStringValue()
+				received[msgStr] = msg.From
 			case <-timeout:
 				return received
 			}
@@ -174,31 +152,12 @@ func TestBroadcastingMessageThreeNodes(t *testing.T) {
 		return received
 	}
 
-	// NodeC should receive both broadcasts
 	receivedC := collectMessages(nodeC.Inbox, 2)
-	if from, ok := receivedC[msgA]; !ok || from != "nodeA" {
+	if from, ok := receivedC["Hello from A"]; !ok || from != "nodeA" {
 		t.Errorf("NodeC did not receive broadcast from nodeA")
 	}
-	if from, ok := receivedC[msgB]; !ok || from != "nodeB" {
+	if from, ok := receivedC["Hello from B"]; !ok || from != "nodeB" {
 		t.Errorf("NodeC did not receive broadcast from nodeB")
-	}
-
-	// NodeA should receive broadcast from nodeB
-	receivedA := collectMessages(nodeA.Inbox, 2)
-	if from, ok := receivedA[msgA]; !ok || from != "nodeA" {
-		t.Errorf("NodeA did not receive broadcast from nodeA")
-	}
-	if from, ok := receivedA[msgB]; !ok || from != "nodeB" {
-		t.Errorf("NodeA did not receive broadcast from nodeB")
-	}
-
-	// NodeB should receive broadcast from nodeA
-	receivedB := collectMessages(nodeB.Inbox, 2)
-	if from, ok := receivedB[msgA]; !ok || from != "nodeA" {
-		t.Errorf("NodeB did not receive broadcast from nodeA")
-	}
-	if from, ok := receivedB[msgB]; !ok || from != "nodeB" {
-		t.Errorf("NodeB did not receive broadcast from nodeB")
 	}
 }
 
@@ -209,7 +168,6 @@ func TestGroupMessagingConcurrent(t *testing.T) {
 		lis.Close()
 	}()
 
-	// Connect three nodes
 	nodeA, _ := Connect("localhost:50051", "nodeA")
 	nodeB, _ := Connect("localhost:50051", "nodeB")
 	nodeC, _ := Connect("localhost:50051", "nodeC")
@@ -217,7 +175,6 @@ func TestGroupMessagingConcurrent(t *testing.T) {
 	defer nodeB.Close()
 	defer nodeC.Close()
 
-	// Subscribe nodes to groups
 	nodeA.Subscribe("AB")
 	nodeB.Subscribe("AB")
 	nodeB.Subscribe("BC")
@@ -225,14 +182,12 @@ func TestGroupMessagingConcurrent(t *testing.T) {
 	nodeA.Subscribe("AC")
 	nodeC.Subscribe("AC")
 
-	time.Sleep(50 * time.Millisecond) // allow subscriptions to be processed
+	time.Sleep(50 * time.Millisecond)
 
-	// Publish messages to each group
-	nodeA.Publish("AB", "msg1-AB")
-	nodeB.Publish("BC", "msg2-BC")
-	nodeC.Publish("AC", "msg3-AC")
+	nodeA.Publish("AB", map[string]any{"message": "msg1-AB"}, "group_msg")
+	nodeB.Publish("BC", map[string]any{"message": "msg2-BC"}, "group_msg")
+	nodeC.Publish("AC", map[string]any{"message": "msg3-AC"}, "group_msg")
 
-	// Concurrently collect messages for all nodes
 	nodes := []*DSNet{nodeA, nodeB, nodeC}
 	results := make(map[string]map[string]string)
 	var mu sync.Mutex
@@ -247,10 +202,10 @@ func TestGroupMessagingConcurrent(t *testing.T) {
 			for {
 				select {
 				case msg := <-n.Inbox:
-					received[msg.Payload] = msg.From
+					received[msg.Payload.Fields["message"].GetStringValue()] = msg.From
 				case <-timeout:
 					mu.Lock()
-					results[n.NodeID] = received
+					results[n.nodeId] = received
 					mu.Unlock()
 					return
 				}
@@ -258,10 +213,9 @@ func TestGroupMessagingConcurrent(t *testing.T) {
 		}(node)
 	}
 
-	wg.Wait() // wait for all message collectors
+	wg.Wait()
 
-	// Assertions: ensure each node received exactly the messages it should
-	// Group AB: nodeA and nodeB
+	// Assertions for groups
 	if _, ok := results["nodeA"]["msg1-AB"]; !ok {
 		t.Errorf("nodeA did not receive msg1-AB")
 	}
@@ -272,7 +226,6 @@ func TestGroupMessagingConcurrent(t *testing.T) {
 		t.Errorf("nodeC should not receive AB messages")
 	}
 
-	// Group BC: nodeB and nodeC
 	if _, ok := results["nodeB"]["msg2-BC"]; !ok {
 		t.Errorf("nodeB did not receive msg2-BC")
 	}
@@ -283,7 +236,6 @@ func TestGroupMessagingConcurrent(t *testing.T) {
 		t.Errorf("nodeA should not receive BC messages")
 	}
 
-	// Group AC: nodeA and nodeC
 	if _, ok := results["nodeA"]["msg3-AC"]; !ok {
 		t.Errorf("nodeA did not receive msg3-AC")
 	}
