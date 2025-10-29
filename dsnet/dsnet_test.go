@@ -1,6 +1,8 @@
 package dsnet
 
 import (
+	"context"
+	"fmt"
 	"net"
 	"sync"
 	"testing"
@@ -52,6 +54,31 @@ func waitForMsg(ch chan *gh.Envelope, expected, from string) bool {
 	}
 }
 
+func connectNodesConcurrently(t *testing.T, addr string, ids ...string) []*DSNet {
+	t.Helper()
+
+	nodes := make([]*DSNet, len(ids))
+	errs := make([]error, len(ids))
+
+	var wg sync.WaitGroup
+	for i, id := range ids {
+		wg.Add(1)
+		go func(i int, id string) {
+			defer wg.Done()
+			nodes[i], errs[i] = Connect(addr, id)
+		}(i, id)
+	}
+	wg.Wait()
+
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("failed to connect %s: %v", ids[i], err)
+		}
+	}
+
+	return nodes
+}
+
 func TestClientMessaging(t *testing.T) {
 	grpcServer, lis := startTestServer(t)
 	defer func() {
@@ -59,16 +86,14 @@ func TestClientMessaging(t *testing.T) {
 		lis.Close()
 	}()
 
-	nodeA, err := Connect("localhost:50051", "nodeA")
-	if err != nil {
-		t.Fatalf("Failed to connect nodeA: %v", err)
-	}
-	nodeB, err := Connect("localhost:50051", "nodeB")
-	if err != nil {
-		t.Fatalf("Failed to connect nodeB: %v", err)
-	}
-	defer nodeA.Close()
-	defer nodeB.Close()
+	nodes := connectNodesConcurrently(t, "localhost:50051", "nodeA", "nodeB")
+	defer func() {
+		for _, n := range nodes {
+			n.Close()
+		}
+	}()
+
+	nodeA, nodeB := nodes[0], nodes[1]
 
 	expectedMsgAtoB := "Hello from A to B"
 	if err := nodeA.Send("nodeB", map[string]any{"message": expectedMsgAtoB}, "chat"); err != nil {
@@ -95,10 +120,14 @@ func TestBroadcastingMessage(t *testing.T) {
 		lis.Close()
 	}()
 
-	nodeA, _ := Connect("localhost:50051", "nodeA")
-	nodeB, _ := Connect("localhost:50051", "nodeB")
-	defer nodeA.Close()
-	defer nodeB.Close()
+	nodes := connectNodesConcurrently(t, "localhost:50051", "nodeA", "nodeB")
+	defer func() {
+		for _, n := range nodes {
+			n.Close()
+		}
+	}()
+
+	nodeA, nodeB := nodes[0], nodes[1]
 
 	if err := nodeA.Broadcast(map[string]any{"message": "Hello from A to B"}, "chat"); err != nil {
 		t.Fatalf("Failed to broadcast from A: %v", err)
@@ -122,12 +151,14 @@ func TestBroadcastingMessageThreeNodes(t *testing.T) {
 		lis.Close()
 	}()
 
-	nodeA, _ := Connect("localhost:50051", "nodeA")
-	nodeB, _ := Connect("localhost:50051", "nodeB")
-	nodeC, _ := Connect("localhost:50051", "nodeC")
-	defer nodeA.Close()
-	defer nodeB.Close()
-	defer nodeC.Close()
+	nodes := connectNodesConcurrently(t, "localhost:50051", "nodeA", "nodeB", "nodeC")
+	defer func() {
+		for _, n := range nodes {
+			n.Close()
+		}
+	}()
+
+	nodeA, nodeB, nodeC := nodes[0], nodes[1], nodes[2]
 
 	if err := nodeA.Broadcast(map[string]any{"message": "Hello from A"}, "chat"); err != nil {
 		t.Fatalf("Failed to broadcast from nodeA: %v", err)
@@ -168,12 +199,14 @@ func TestGroupMessagingConcurrent(t *testing.T) {
 		lis.Close()
 	}()
 
-	nodeA, _ := Connect("localhost:50051", "nodeA")
-	nodeB, _ := Connect("localhost:50051", "nodeB")
-	nodeC, _ := Connect("localhost:50051", "nodeC")
-	defer nodeA.Close()
-	defer nodeB.Close()
-	defer nodeC.Close()
+	nodes := connectNodesConcurrently(t, "localhost:50051", "nodeA", "nodeB", "nodeC")
+	defer func() {
+		for _, n := range nodes {
+			n.Close()
+		}
+	}()
+
+	nodeA, nodeB, nodeC := nodes[0], nodes[1], nodes[2]
 
 	nodeA.Subscribe("AB")
 	nodeB.Subscribe("AB")
@@ -188,7 +221,7 @@ func TestGroupMessagingConcurrent(t *testing.T) {
 	nodeB.Publish("BC", map[string]any{"message": "msg2-BC"}, "group_msg")
 	nodeC.Publish("AC", map[string]any{"message": "msg3-AC"}, "group_msg")
 
-	nodes := []*DSNet{nodeA, nodeB, nodeC}
+	nodes = []*DSNet{nodeA, nodeB, nodeC}
 	results := make(map[string]map[string]string)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -245,4 +278,92 @@ func TestGroupMessagingConcurrent(t *testing.T) {
 	if _, ok := results["nodeB"]["msg3-AC"]; ok {
 		t.Errorf("nodeB should not receive AC messages")
 	}
+}
+
+type ChatMessage struct {
+	Message string
+}
+
+func TestTypeSafeBroadcastAndGroup(t *testing.T) {
+	grpcServer, lis := startTestServer(t)
+	defer func() {
+		grpcServer.GracefulStop()
+		lis.Close()
+	}()
+
+	nodes := connectNodesConcurrently(t, "localhost:50051", "nodeA", "nodeB", "nodeC")
+	defer func() {
+		for _, n := range nodes {
+			n.Close()
+		}
+	}()
+
+	nodeA, nodeB, nodeC := nodes[0], nodes[1], nodes[2]
+
+	// --- Prepare handler maps ---
+	results := struct {
+		sync.Mutex
+		m map[string][]ChatMessage
+	}{m: make(map[string][]ChatMessage)}
+
+	// --- Register type-safe handlers ---
+	for _, node := range []*DSNet{nodeA, nodeB, nodeC} {
+		n := node
+		On(n, "chat", func(ctx context.Context, from string, msg ChatMessage) error {
+			results.Lock()
+			results.m[n.GetNodeID()] = append(results.m[n.GetNodeID()], msg)
+			results.Unlock()
+			return nil
+		})
+	}
+
+	// --- Subscribe to groups ---
+	nodeA.Subscribe("AB")
+	nodeB.Subscribe("AB")
+	nodeB.Subscribe("BC")
+	nodeC.Subscribe("BC")
+	nodeA.Subscribe("AC")
+	nodeC.Subscribe("AC")
+
+	time.Sleep(50 * time.Millisecond) // let subscriptions propagate
+
+	// --- Send group messages ---
+	nodeA.Publish("AB", ChatMessage{Message: "msg1-AB"}, "chat")
+	nodeB.Publish("BC", ChatMessage{Message: "msg2-BC"}, "chat")
+	nodeC.Publish("AC", ChatMessage{Message: "msg3-AC"}, "chat")
+
+	// --- Wait for messages to arrive ---
+	time.Sleep(200 * time.Millisecond)
+
+	// --- Assertions ---
+	check := func(nodeID string, expected ...string) {
+		results.Lock()
+		defer results.Unlock()
+		received := make(map[string]struct{})
+		for _, msg := range results.m[nodeID] {
+			received[msg.Message] = struct{}{}
+		}
+		for _, exp := range expected {
+			if _, ok := received[exp]; !ok {
+				t.Errorf("%s did not receive expected message: %s", nodeID, exp)
+			}
+		}
+		for msg := range received {
+			found := false
+			for _, exp := range expected {
+				if msg == exp {
+					found = true
+				}
+			}
+			if !found {
+				t.Errorf("%s received unexpected message: %s", nodeID, msg)
+			}
+		}
+	}
+
+	check("nodeA", "msg1-AB", "msg3-AC")
+	check("nodeB", "msg1-AB", "msg2-BC")
+	check("nodeC", "msg2-BC", "msg3-AC")
+
+	fmt.Println("✅ Type-safe group/broadcast test passed")
 }

@@ -6,12 +6,6 @@ package dsnet;
 option go_package = "dsnet/proto;proto";
 import "google/protobuf/struct.proto";
 
-/*
- * N = Client never fills this value
- * O = Client can fill this value (Optional)
- * C = Client always fills this value
- */
-
 // O defaults to DIRECT
 enum DeliveryType {
   DIRECT = 0; // default value if not set
