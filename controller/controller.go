@@ -60,12 +60,7 @@ func (c *Controller) ControlStream(stream pb.NetworkController_ControlStreamServ
 
 		switch payload := in.Payload.(type) {
 		case *pb.ClientToController_Register:
-			nodeID = payload.Register.NodeId
-			c.mu.Lock()
-			c.nodes[nodeID] = stream
-			c.mu.Unlock()
-			c.log.Printf("Registered node: %s", nodeID)
-			c.sendRegisteredResponse(nodeID)
+			nodeID = c.handleRegister(payload, stream)
 
 		case *pb.ClientToController_Subscribe:
 			c.addToGroup(payload.Subscribe.NodeId, payload.Subscribe.Group)
@@ -79,21 +74,22 @@ func (c *Controller) ControlStream(stream pb.NetworkController_ControlStreamServ
 	}
 }
 
-func (c *Controller) sendRegisteredResponse(nodeId string) {
+func (c *Controller) handleRegister(payload *pb.ClientToController_Register, stream pb.NetworkController_ControlStreamServer) string {
+	nodeID := payload.Register.NodeId
+
 	c.mu.Lock()
-	stream, ok := c.nodes[nodeId]
+	c.nodes[nodeID] = stream
 	c.mu.Unlock()
 
-	if !ok {
-		c.log.Printf("sendRegisteredResponse: node %s not found", nodeId)
-		return
-	}
+	c.log.Printf("Registered node: %s", nodeID)
 
 	if err := stream.Send(&pb.ControllerToClient{
 		Payload: &pb.ControllerToClient_Register{},
 	}); err != nil {
-		c.log.Printf("Failed to send REGISTERED to %s: %v", nodeId, err)
+		c.log.Printf("Failed to send REGISTERED to %s: %v", nodeID, err)
 	}
+
+	return nodeID
 }
 
 func (c *Controller) addToGroup(nodeId, group string) {
@@ -118,54 +114,63 @@ func (c *Controller) removeFromGroup(nodeId, group string) {
 func (c *Controller) forward(env *pb.Envelope) {
 	switch env.DeliveryType {
 	case pb.DeliveryType_BROADCAST:
-		c.mu.Lock()
-		defer c.mu.Unlock()
-
-		for nodeID, stream := range c.nodes {
-			if err := stream.Send(&pb.ControllerToClient{
-				Payload: &pb.ControllerToClient_Forward{
-					Forward: env,
-				},
-			}); err != nil {
-				c.log.Printf("Failed to broadcast to %s: %v", nodeID, err)
-			}
-		}
-		c.log.Printf("Broadcasted from %s: %v", env.From, env.Payload)
-
+		c.sendBroadcast(env)
 	case pb.DeliveryType_GROUP:
-		c.mu.Lock()
-		members := c.groups[env.Group]
-		c.mu.Unlock()
+		c.sendGroup(env)
+	default:
+		c.sendDirect(env)
+	}
+}
 
-		for id := range members {
-			if stream, ok := c.nodes[id]; ok {
-				err := stream.Send(&pb.ControllerToClient{
-					Payload: &pb.ControllerToClient_Forward{
-						Forward: env,
-					},
-				})
-				if err != nil {
-					c.log.Printf("Failed to send to %s in group %s: %v", id, env.Group, err)
-				}
-			}
-		}
+func (c *Controller) sendDirect(env *pb.Envelope) {
+	c.mu.Lock()
+	dest, ok := c.nodes[env.To]
+	c.mu.Unlock()
+	if !ok {
+		c.log.Printf("Unknown destination: %s", env.To)
+		return
+	}
+	if err := dest.Send(&pb.ControllerToClient{
+		Payload: &pb.ControllerToClient_Forward{
+			Forward: env,
+		},
+	}); err != nil {
+		c.log.Printf("Failed to send to %s: %v", env.To, err)
+	} else {
+		c.log.Printf("Forwarded %s -> %s: %v", env.From, env.To, env.Payload)
+	}
+}
+func (c *Controller) sendBroadcast(env *pb.Envelope) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	default: // DIRECT
-		c.mu.Lock()
-		dest, ok := c.nodes[env.To]
-		c.mu.Unlock()
-		if !ok {
-			c.log.Printf("Unknown destination: %s", env.To)
-			return
-		}
-		if err := dest.Send(&pb.ControllerToClient{
+	for nodeID, stream := range c.nodes {
+		if err := stream.Send(&pb.ControllerToClient{
 			Payload: &pb.ControllerToClient_Forward{
 				Forward: env,
 			},
 		}); err != nil {
-			c.log.Printf("Failed to send to %s: %v", env.To, err)
-		} else {
-			c.log.Printf("Forwarded %s -> %s: %v", env.From, env.To, env.Payload)
+			c.log.Printf("Failed to broadcast to %s: %v", nodeID, err)
+		}
+	}
+	c.log.Printf("Broadcasted from %s: %v", env.From, env.Payload)
+}
+
+func (c *Controller) sendGroup(env *pb.Envelope) {
+	c.mu.Lock()
+	members := c.groups[env.Group]
+	c.mu.Unlock()
+
+	for id := range members {
+		if stream, ok := c.nodes[id]; ok {
+			err := stream.Send(&pb.ControllerToClient{
+				Payload: &pb.ControllerToClient_Forward{
+					Forward: env,
+				},
+			})
+			if err != nil {
+				c.log.Printf("Failed to send to %s in group %s: %v", id, env.Group, err)
+			}
 		}
 	}
 }
