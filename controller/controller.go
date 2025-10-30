@@ -3,6 +3,7 @@ package controller
 import (
 	"io"
 	"sync"
+	"time"
 
 	pb "github.com/distcode/dsnet/proto"
 	"google.golang.org/grpc/codes"
@@ -19,10 +20,11 @@ type ControllerProps struct {
  */
 type Controller struct {
 	pb.UnimplementedNetworkControllerServer
-	mu     sync.Mutex
-	nodes  map[string]pb.NetworkController_ControlStreamServer
-	groups map[string]map[string]struct{}
-	log    Logger
+	mu         sync.Mutex
+	nodes      map[string]pb.NetworkController_ControlStreamServer
+	groups     map[string]map[string]struct{}
+	log        Logger
+	messageLog []LoggedMessage
 }
 
 func NewController(props ControllerProps) *Controller {
@@ -35,6 +37,16 @@ func NewController(props ControllerProps) *Controller {
 		groups: make(map[string]map[string]struct{}),
 		log:    props.Logger,
 	}
+}
+
+type LoggedMessage struct {
+	Msg       *pb.ClientToController
+	Timestamp time.Time
+	NodeID    string
+}
+
+func (c *Controller) GetLog() []LoggedMessage {
+	return c.messageLog
 }
 
 func (c *Controller) ControlStream(stream pb.NetworkController_ControlStreamServer) error {
@@ -57,6 +69,12 @@ func (c *Controller) ControlStream(stream pb.NetworkController_ControlStreamServ
 			c.log.Printf("stream recv non-expected error: %v", err)
 			return err
 		}
+
+		c.messageLog = append(c.messageLog, LoggedMessage{
+			Msg:       in,
+			Timestamp: time.Now(),
+			NodeID:    nodeID,
+		})
 
 		switch payload := in.Payload.(type) {
 		case *pb.ClientToController_Register:

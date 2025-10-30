@@ -65,4 +65,6 @@ func TestMinimalTypeSafeMessaging(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("timeout: message not received")
 	}
+
+	fmt.Println(ctrl.GetLog())
 }
