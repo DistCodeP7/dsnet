@@ -3,6 +3,7 @@ package controller
 import (
 	"io"
 	"sync"
+	"time"
 
 	pb "github.com/distcode/dsnet/proto"
 )
@@ -21,6 +22,7 @@ type Controller struct {
 	nodes  map[string]pb.NetworkController_ControlStreamServer
 	groups map[string]map[string]struct{}
 	log    Logger
+	msgNum int
 }
 
 func NewController(props ControllerProps) *Controller {
@@ -130,7 +132,6 @@ func (c *Controller) forward(env *pb.Envelope) {
 				stream.Send(&pb.ControllerToClient{Inbound: env})
 			}
 		}
-
 	default:
 		c.mu.Lock()
 		dest, ok := c.nodes[env.To]
@@ -144,5 +145,30 @@ func (c *Controller) forward(env *pb.Envelope) {
 		} else {
 			c.log.Printf("Forwarded %s -> %s: %s", env.From, env.To, env.Payload)
 		}
+	}
+
+	persistMsg := StoredMessage{
+		Id:      c.generateID(),
+		Payload: []byte(env.Payload),
+		From:    env.From,
+		To:      env.To,
+		Group:   env.Group,
+		Time:    time.Now().Unix(),
+	}
+
+	enqueuePersistMessage(persistMsg)
+}
+
+func (c *Controller) generateID() int {
+	c.msgNum++
+	return c.msgNum
+}
+
+func enqueuePersistMessage(msg StoredMessage) {
+	select {
+	case persistCh <- msg:
+		// Message enqueued successfully
+	default:
+		// Message queue is full, drop the message
 	}
 }
