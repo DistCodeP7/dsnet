@@ -16,7 +16,7 @@ func StartTestServer(t *testing.T) (*grpc.Server, net.Listener) {
 	ctrl := controller.NewController(controller.ControllerProps{})
 	pb.RegisterNetworkControllerServer(grpcServer, ctrl)
 
-	lis, err := net.Listen("tcp", "127.0.0.1:50051")
+	lis, err := net.Listen("tcp", ":0")
 	if err != nil {
 		t.Fatalf("Failed to listen: %v", err)
 	}

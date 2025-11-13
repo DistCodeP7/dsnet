@@ -14,11 +14,11 @@ func TestClientMessaging(t *testing.T) {
 		lis.Close()
 	}()
 
-	nodeA, err := Connect("nodeA")
+	nodeA, err := Connect("nodeA", lis.Addr().String())
 	if err != nil {
 		t.Fatalf("Failed to connect nodeA: %v", err)
 	}
-	nodeB, err := Connect("nodeB")
+	nodeB, err := Connect("nodeB", lis.Addr().String())
 	if err != nil {
 		t.Fatalf("Failed to connect nodeB: %v", err)
 	}
