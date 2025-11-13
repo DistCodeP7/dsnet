@@ -23,28 +23,19 @@ enum MessageType {
   BROADCAST = 1;
   GROUP = 2;
   REGISTERED = 3;
+  REQUEST_TOKEN = 4;
+  RELEASE_TOKEN = 5;
+  TOKEN = 6;
 }
 
 message RegisterReq {
   string node_id = 1;
 }
 
-message SubscribeReq {
-  string node_id = 1;
-  string group = 2;
-}
-
-message UnsubscribeReq {
-  string node_id = 1;
-  string group = 2;
-}
-
 message ClientToController {
   oneof payload {
     RegisterReq register = 1;
     Envelope outbound = 2;
-    SubscribeReq subscribe = 3;
-    UnsubscribeReq unsubscribe = 4;
   }
 }
 
