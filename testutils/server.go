@@ -1,6 +1,7 @@
 package testutils
 
 import (
+	"log"
 	"net"
 	"testing"
 	"time"
@@ -20,7 +21,12 @@ func StartTestServer(t *testing.T) (*grpc.Server, net.Listener) {
 	if err != nil {
 		t.Fatalf("Failed to listen: %v", err)
 	}
-	go grpcServer.Serve(lis)
+	
+	go func() {
+        if err := grpcServer.Serve(lis); err != nil && err != grpc.ErrServerStopped {
+            log.Printf("gRPC server failed: %v", err)
+        }
+    }()
 
 	return grpcServer, lis
 }

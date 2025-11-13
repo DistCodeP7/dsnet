@@ -16,6 +16,7 @@ func TestCentralizedMutex(t *testing.T) {
 	defer server.Stop()
 	defer lis.Close()
 
+	addr := lis.Addr().String()
 	nodes := []string{"A", "B", "C"}
 	network := make(map[string]*dsnet.DSNet)
 	mutexHandlers := make(map[string]*MutexHandler)
