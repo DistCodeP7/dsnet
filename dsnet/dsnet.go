@@ -112,65 +112,17 @@ func (d *DSNet) listen() {
 	}
 }
 
-// Broadcast sends a message to all nodes.
-func (d *DSNet) Broadcast(msg string) error {
-	env := &pb.Envelope{
-		From:    d.NodeID,
-		Payload: msg,
-		Type:    pb.MessageType_BROADCAST,
-	}
-	return d.stream.Send(&pb.ClientToController{
-		Payload: &pb.ClientToController_Outbound{Outbound: env},
-	})
-}
-
-// Send sends a direct message to a single node.
-func (d *DSNet) Send(to, msg string) error {
+func (d *DSNet) SendToken(to string) error {
+	
 	env := &pb.Envelope{
 		From:    d.NodeID,
 		To:      to,
-		Payload: msg,
-		Type:    pb.MessageType_DIRECT,
+		Payload: "token",
+		Type:    pb.MessageType_TOKEN,
 	}
+
 	return d.stream.Send(&pb.ClientToController{
 		Payload: &pb.ClientToController_Outbound{Outbound: env},
-	})
-}
-
-// Publish sends a message to a group.
-func (d *DSNet) Publish(group, msg string) error {
-	env := &pb.Envelope{
-		From:    d.NodeID,
-		Group:   group,
-		Payload: msg,
-		Type:    pb.MessageType_GROUP,
-	}
-	return d.stream.Send(&pb.ClientToController{
-		Payload: &pb.ClientToController_Outbound{Outbound: env},
-	})
-}
-
-// Subscribe subscribes the node to a group.
-func (d *DSNet) Subscribe(group string) error {
-	return d.stream.Send(&pb.ClientToController{
-		Payload: &pb.ClientToController_Subscribe{
-			Subscribe: &pb.SubscribeReq{
-				NodeId: d.NodeID,
-				Group:  group,
-			},
-		},
-	})
-}
-
-// Unsubscribe unsubscribes the node from a group.
-func (d *DSNet) Unsubscribe(group string) error {
-	return d.stream.Send(&pb.ClientToController{
-		Payload: &pb.ClientToController_Unsubscribe{
-			Unsubscribe: &pb.UnsubscribeReq{
-				NodeId: d.NodeID,
-				Group:  group,
-			},
-		},
 	})
 }
 
@@ -179,3 +131,4 @@ func (d *DSNet) Recv() (*pb.Envelope, bool) {
 	env, ok := <-d.Inbox
 	return env, ok
 }
+
