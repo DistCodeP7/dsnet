@@ -11,18 +11,16 @@ import (
 )
 
 func TestCentralizedMutex(t *testing.T) {
-	server, err := testutils.StartTestServer(t)
-	if err != nil {
-		t.Fatalf("failed to start controller: %v", err)
-	}
+	server, lis := testutils.StartTestServer(t)
 	defer server.Stop()
 
+	addr := lis.Addr().String()
 	nodes := []string{"A", "B", "C"}
 	network := make(map[string]*dsnet.DSNet)
 
 	//Create nodes
 	for _, id := range nodes {
-		node, err := dsnet.Connect(id)
+		node, err := dsnet.Connect(id, addr)
 		if err != nil {
 			t.Fatalf("failed to connect node %s: %v", id, err)
 		}
@@ -64,6 +62,5 @@ func TestCentralizedMutex(t *testing.T) {
 				_ = network[next].Send(next, "TOKEN", pb.MessageType_REQUEST_TOKEN)
 			}
 		}(id, mutex)
-
 	}
 }
