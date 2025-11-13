@@ -31,8 +31,6 @@ import (
 
 func TestCentralizedMutex(t *testing.T) {
 	server, lis := testutils.StartTestServer(t)
-	defer server.Stop()
-	defer lis.Close()
 
 	addr := lis.Addr().String()
 	nodes := []string{"A", "B", "C", "D", "E"}
@@ -85,9 +83,8 @@ func TestCentralizedMutex(t *testing.T) {
 				cs.Work(nodeID, 300*time.Millisecond, func() {
 					fmt.Printf("[%s] entered critical section\n", nodeID)
 				})
-				wg.Done() // signal completion
+				wg.Done()
 
-				// Release token back to A
 				mutex.ReleaseToken(network[nodeID], "A")
 				fmt.Printf("[%s] returned token to A\n", nodeID)
 			}
@@ -110,6 +107,15 @@ func TestCentralizedMutex(t *testing.T) {
 
 	select {
 	case <-doneCh:
+		// Signal nodes to close their connections first so they can finish cleanly.
+		for _, node := range network {
+			_ = node.Close()
+		}
+		// Give clients a short moment to complete their shutdown and finish in-flight RPCs.
+		time.Sleep(20 * time.Millisecond)
+		server.GracefulStop()
+		_ = lis.Close()
+
 		fmt.Println("All nodes have entered the critical section once")
 	case <-time.After(30 * time.Second):
 		t.Fatal("Test timed out, likely a deadlock")
