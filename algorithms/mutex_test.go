@@ -23,7 +23,7 @@ func TestCentralizedMutex(t *testing.T) {
 
 	// Create nodes
 	for _, id := range nodes {
-		node, err := dsnet.Connect(id, lis.Addr().String())
+		node, err := dsnet.Connect(id, addr)
 		if err != nil {
 			t.Fatalf("failed to connect node %s: %v", id, err)
 		}
