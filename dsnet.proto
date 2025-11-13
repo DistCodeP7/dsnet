@@ -23,7 +23,8 @@ enum MessageType {
   BROADCAST = 1;
   GROUP = 2;
   REGISTERED = 3;
-  TOKEN = 4;
+  REQUEST_TOKEN = 4;
+  TOKEN = 5;
 }
 
 message RegisterReq {

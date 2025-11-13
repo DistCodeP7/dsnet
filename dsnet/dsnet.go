@@ -112,23 +112,48 @@ func (d *DSNet) listen() {
 	}
 }
 
-func (d *DSNet) SendToken(to string) error {
-	
-	env := &pb.Envelope{
-		From:    d.NodeID,
-		To:      to,
-		Payload: "token",
-		Type:    pb.MessageType_TOKEN,
-	}
-
-	return d.stream.Send(&pb.ClientToController{
-		Payload: &pb.ClientToController_Outbound{Outbound: env},
-	})
-}
-
 // Recv reads a message from the Inbox channel.
 func (d *DSNet) Recv() (*pb.Envelope, bool) {
 	env, ok := <-d.Inbox
 	return env, ok
 }
 
+func (d *DSNet) Send(to string, payload string, msgType pb.MessageType) error {
+	env := &pb.Envelope{
+		From:    d.NodeID,
+		To:      to,
+		Payload: payload,
+		Type:    msgType,
+	}
+	return d.stream.Send(&pb.ClientToController{
+		Payload: &pb.ClientToController_Outbound{
+			Outbound: env,
+		},
+	})
+}
+
+// TODO
+func (d *DSNet) Broadcast(group string, payload string, msgType pb.MessageType) error {
+	return d.Send("", payload, msgType)
+}
+
+type NodeHandler interface {
+	OnEvent(env *pb.Envelope) []*pb.Envelope
+}
+
+func (d *DSNet) RunAlgo(handler NodeHandler) {
+	for {
+		select {
+		case env, ok := <-d.Inbox:
+			if !ok {
+				return
+			}
+			outgoing := handler.OnEvent(env)
+			for _, msg := range outgoing {
+				_ = d.Send(msg.To, msg.Payload, msg.Type)
+			}
+		case <-d.closeCh:
+			return
+		}
+	}
+}

@@ -93,9 +93,12 @@ func (c *Controller) forward(env *pb.Envelope) {
 		c.log.Printf("Unknown destination: %s", env.To)
 		return
 	}
-	if err := dest.Send(&pb.ControllerToClient{Inbound: env}); err != nil {
-		c.log.Printf("Failed to send to %s: %v", env.To, err)
-	} else {
-		c.log.Printf("Forwarded %s -> %s: %s", env.From, env.To, env.Payload)
-	}
+
+	go func() {
+		if err := dest.Send(&pb.ControllerToClient{Inbound: env}); err != nil {
+			c.log.Printf("Failed to send to %s: %v", env.To, err)
+		} else {
+			c.log.Printf("Forwarded %s -> %s: %s", env.From, env.To, env.Payload)
+		}
+	}()
 }
