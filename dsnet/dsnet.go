@@ -30,6 +30,7 @@ type DSNet struct {
 
 // ConnectWithContext connects a node to the controller with a context.
 func ConnectWithContext(ctx context.Context, nodeID string, addr string) (*DSNet, error) {
+	//listen to the server to use as controller addr
 	controllerAddr := addr
 	clientConn, err := grpc.NewClient(controllerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {

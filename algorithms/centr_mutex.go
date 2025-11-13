@@ -38,7 +38,9 @@ func (h *MutexHandler) RequestToken(d *dsnet.DSNet, tokenHolder string) {
 	h.waiting = true
 	h.mu.Unlock()
 
-	_ = d.Send(tokenHolder, "REQUEST_TOKEN", pb.MessageType_TOKEN)
+	// Send a REQUEST_TOKEN to the current token holder. Use the correct
+	// message type (REQUEST_TOKEN) so the recipient handles it as a request.
+	_ = d.Send(tokenHolder, "REQUEST_TOKEN", pb.MessageType_REQUEST_TOKEN)
 }
 
 func (h *MutexHandler) OnEvent(env *pb.Envelope) []*pb.Envelope {
@@ -53,7 +55,7 @@ func (h *MutexHandler) OnEvent(env *pb.Envelope) []*pb.Envelope {
 			return []*pb.Envelope{
 				{
 					From:    h.NodeID,
-					To:      env.To,
+					To:      env.From,
 					Payload: "TOKEN",
 					Type:    pb.MessageType_TOKEN,
 				},
