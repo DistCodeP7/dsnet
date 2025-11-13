@@ -34,4 +34,3 @@ jobs:
           push: true
           tags: |
             ghcr.io/distcodep7/dsnet:latest
-            ghcr.io/distcodep7/dsnet:${{ github.sha }}
