@@ -24,7 +24,8 @@ enum MessageType {
   GROUP = 2;
   REGISTERED = 3;
   REQUEST_TOKEN = 4;
-  TOKEN = 5;
+  RELEASE_TOKEN = 5;
+  TOKEN = 6;
 }
 
 message RegisterReq {

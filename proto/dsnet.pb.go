@@ -29,7 +29,8 @@ const (
 	MessageType_GROUP         MessageType = 2
 	MessageType_REGISTERED    MessageType = 3
 	MessageType_REQUEST_TOKEN MessageType = 4
-	MessageType_TOKEN         MessageType = 5
+	MessageType_RELEASE_TOKEN MessageType = 5
+	MessageType_TOKEN         MessageType = 6
 )
 
 // Enum value maps for MessageType.
@@ -40,7 +41,8 @@ var (
 		2: "GROUP",
 		3: "REGISTERED",
 		4: "REQUEST_TOKEN",
-		5: "TOKEN",
+		5: "RELEASE_TOKEN",
+		6: "TOKEN",
 	}
 	MessageType_value = map[string]int32{
 		"DIRECT":        0,
@@ -48,7 +50,8 @@ var (
 		"GROUP":         2,
 		"REGISTERED":    3,
 		"REQUEST_TOKEN": 4,
-		"TOKEN":         5,
+		"RELEASE_TOKEN": 5,
+		"TOKEN":         6,
 	}
 )
 
@@ -411,7 +414,7 @@ const file_dsnet_proto_rawDesc = "" +
 	"\boutbound\x18\x02 \x01(\v2\x0f.dsnet.EnvelopeH\x00R\boutboundB\t\n" +
 	"\apayload\"?\n" +
 	"\x12ControllerToClient\x12)\n" +
-	"\ainbound\x18\x01 \x01(\v2\x0f.dsnet.EnvelopeR\ainbound*a\n" +
+	"\ainbound\x18\x01 \x01(\v2\x0f.dsnet.EnvelopeR\ainbound*t\n" +
 	"\vMessageType\x12\n" +
 	"\n" +
 	"\x06DIRECT\x10\x00\x12\r\n" +
@@ -419,8 +422,9 @@ const file_dsnet_proto_rawDesc = "" +
 	"\x05GROUP\x10\x02\x12\x0e\n" +
 	"\n" +
 	"REGISTERED\x10\x03\x12\x11\n" +
-	"\rREQUEST_TOKEN\x10\x04\x12\t\n" +
-	"\x05TOKEN\x10\x052^\n" +
+	"\rREQUEST_TOKEN\x10\x04\x12\x11\n" +
+	"\rRELEASE_TOKEN\x10\x05\x12\t\n" +
+	"\x05TOKEN\x10\x062^\n" +
 	"\x11NetworkController\x12I\n" +
 	"\rControlStream\x12\x19.dsnet.ClientToController\x1a\x19.dsnet.ControllerToClient(\x010\x01B\x13Z\x11dsnet/proto;protob\x06proto3"
 
