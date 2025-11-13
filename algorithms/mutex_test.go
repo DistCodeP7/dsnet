@@ -85,7 +85,10 @@ func TestCentralizedMutex(t *testing.T) {
 				})
 				wg.Done()
 
-				mutex.ReleaseToken(network[nodeID], "A")
+				env := mutex.ReleaseToken("A")
+				if env != nil {
+					_ = network[nodeID].Send(env.To, env.Payload, env.Type)
+				}
 				fmt.Printf("[%s] returned token to A\n", nodeID)
 			}
 		}(id, mutex)
@@ -93,10 +96,12 @@ func TestCentralizedMutex(t *testing.T) {
 
 	// Trigger token requests
 	go func() {
-		mutexClients["B"].RequestToken(network["B"], "A")
-		mutexClients["C"].RequestToken(network["C"], "A")
-		mutexClients["D"].RequestToken(network["D"], "A")
-		mutexClients["E"].RequestToken(network["E"], "A")
+	    for _, id := range []string{"B", "C", "D", "E"} {
+	        env := mutexClients[id].RequestToken("A")
+	        if env != nil {
+	            _ = network[id].Send(env.To, env.Payload, env.Type)
+	        }
+	    }
 	}()
 
 	doneCh := make(chan struct{})

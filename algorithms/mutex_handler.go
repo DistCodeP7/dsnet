@@ -3,7 +3,6 @@ package algorithms
 import (
 	"sync"
 
-	"github.com/distcode/dsnet/dsnet"
 	pb "github.com/distcode/dsnet/proto"
 )
 
@@ -24,29 +23,45 @@ func NewMutexClient(nodeID string) *MutexClient {
 	}
 }
 
-// RequestToken sends a request to the server
-func (c *MutexClient) RequestToken(d *dsnet.DSNet, serverID string) {
+// RequestToken prepares a request envelope to be sent to the server.
+func (c *MutexClient) RequestToken(serverID string) *pb.Envelope {
 	c.mu.Lock()
 	c.waiting = true
 	c.mu.Unlock()
 
-	_ = d.Send(serverID, "REQUEST_TOKEN", pb.MessageType_REQUEST_TOKEN)
+	return &pb.Envelope{
+		From:    c.NodeID,
+		To:      serverID,
+		Payload: "REQUEST_TOKEN",
+		Type:    pb.MessageType_REQUEST_TOKEN,
+	}
 }
 
-// ReleaseToken sends the token back to the server after critical section
-func (c *MutexClient) ReleaseToken(d *dsnet.DSNet, serverID string) {
+// ReleaseToken prepares a release envelope to be sent to the server after
+// leaving the critical section. It returns nil if the client does not hold
+// the token.
+func (c *MutexClient) ReleaseToken(serverID string) *pb.Envelope {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	if !c.hasToken {
-		return
+		return nil
 	}
 	c.hasToken = false
-	_ = d.Send(serverID, "RELEASE_TOKEN", pb.MessageType_RELEASE_TOKEN)
+	return &pb.Envelope{
+		From:    c.NodeID,
+		To:      serverID,
+		Payload: "RELEASE_TOKEN",
+		Type:    pb.MessageType_RELEASE_TOKEN,
+	}
 }
 
-// OnEvent handles incoming messages from the server
-func (c *MutexClient) OnEvent(env *pb.Envelope) {
+// OnEvent handles incoming messages from the server. It now implements the
+// project's NodeHandler contract (returning outgoing envelopes). It may
+// produce outgoing messages in response to an event; currently the mutex
+// handler only reacts locally (signals csEntry) and does not generate
+// outgoing envelopes, so it returns nil.
+func (c *MutexClient) OnEvent(env *pb.Envelope) []*pb.Envelope {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -54,9 +69,14 @@ func (c *MutexClient) OnEvent(env *pb.Envelope) {
 		c.hasToken = true
 		if c.waiting {
 			c.waiting = false
-			c.csEntryCh <- struct{}{}
+			// non-blocking send in case nobody is waiting on the channel
+			select {
+			case c.csEntryCh <- struct{}{}:
+			default:
+			}
 		}
 	}
+	return nil
 }
 
 // WaitChan returns a channel for entering the critical section
