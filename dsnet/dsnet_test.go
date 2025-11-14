@@ -1,31 +1,57 @@
 package dsnet
 
 import (
+	"net"
+	"sync"
 	"testing"
+	"time"
 
-<<<<<<< HEAD
 	"github.com/DistcodeP7/dsnet/controller"
 	gh "github.com/DistcodeP7/dsnet/proto"
 
 	"google.golang.org/grpc"
-=======
-	pb "github.com/distcode/dsnet/proto"
-	"github.com/distcode/dsnet/testutils"
->>>>>>> main
 )
 
+func startTestServer(t *testing.T) (*grpc.Server, net.Listener) {
+	grpcServer := grpc.NewServer()
+	ctrl := controller.NewController(controller.ControllerProps{})
+	gh.RegisterNetworkControllerServer(grpcServer, ctrl)
+
+	lis, err := net.Listen("tcp", ":50051")
+	if err != nil {
+		t.Fatalf("Failed to listen: %v", err)
+	}
+	go grpcServer.Serve(lis)
+
+	return grpcServer, lis
+}
+
+func waitForMsg(ch chan *gh.Envelope, expected, from string) bool {
+	timeout := time.After(2 * time.Second)
+	for {
+		select {
+		case msg := <-ch:
+			if msg.Payload == expected && msg.From == from {
+				return true
+			}
+		case <-timeout:
+			return false
+		}
+	}
+}
+
 func TestClientMessaging(t *testing.T) {
-	grpcServer, lis := testutils.StartTestServer(t)
+	grpcServer, lis := startTestServer(t)
 	defer func() {
 		grpcServer.GracefulStop()
 		lis.Close()
 	}()
 
-	nodeA, err := Connect("nodeA", lis.Addr().String())
+	nodeA, err := Connect("nodeA")
 	if err != nil {
 		t.Fatalf("Failed to connect nodeA: %v", err)
 	}
-	nodeB, err := Connect("nodeB", lis.Addr().String())
+	nodeB, err := Connect("nodeB")
 	if err != nil {
 		t.Fatalf("Failed to connect nodeB: %v", err)
 	}
@@ -38,24 +64,23 @@ func TestClientMessaging(t *testing.T) {
 
 	// Node A sends to Node B
 	expectedMsgAtoB := "Hello from A to B"
-	if err := nodeA.Send("nodeB", expectedMsgAtoB, pb.MessageType_DIRECT); err != nil {
+	if err := nodeA.Send("nodeB", expectedMsgAtoB); err != nil {
 		t.Fatalf("Failed to send message from A to B: %v", err)
 	}
 
 	// Node B sends to Node A
 	expectedMsgBtoA := "Hello from B to A"
-	if err := nodeB.Send("nodeA", expectedMsgBtoA, pb.MessageType_DIRECT); err != nil {
+	if err := nodeB.Send("nodeA", expectedMsgBtoA); err != nil {
 		t.Fatalf("Failed to send message from B to A: %v", err)
 	}
 
-	if !testutils.WaitForMsg(nodeB.Inbox, expectedMsgAtoB, "nodeA") {
+	if !waitForMsg(nodeB.Inbox, expectedMsgAtoB, "nodeA") {
 		t.Errorf("NodeB did not receive expected message from NodeA")
 	}
-	if !testutils.WaitForMsg(nodeA.Inbox, expectedMsgBtoA, "nodeB") {
+	if !waitForMsg(nodeA.Inbox, expectedMsgBtoA, "nodeB") {
 		t.Errorf("NodeA did not receive expected message from NodeB")
 	}
 }
-<<<<<<< HEAD
 
 func TestBroadcastingMessage(t *testing.T) {
 	grpcServer, lis := startTestServer(t)
@@ -269,5 +294,3 @@ func TestGroupMessagingConcurrent(t *testing.T) {
 		t.Errorf("nodeB should not receive AC messages")
 	}
 }
-=======
->>>>>>> main

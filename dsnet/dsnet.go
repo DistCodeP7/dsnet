@@ -29,9 +29,8 @@ type DSNet struct {
 }
 
 // ConnectWithContext connects a node to the controller with a context.
-func ConnectWithContext(ctx context.Context, nodeID string, addr string) (*DSNet, error) {
-	//listen to the server to use as controller addr
-	controllerAddr := addr
+func ConnectWithContext(ctx context.Context, nodeID string) (*DSNet, error) {
+	controllerAddr := "localhost:50051" // Default controller address; can be parameterized as needed.
 	clientConn, err := grpc.NewClient(controllerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, err
@@ -75,8 +74,8 @@ func ConnectWithContext(ctx context.Context, nodeID string, addr string) (*DSNet
 	return ds, nil
 }
 
-func Connect(nodeID string, addr string) (*DSNet, error) {
-	return ConnectWithContext(context.Background(), nodeID, addr)
+func Connect(nodeID string) (*DSNet, error) {
+	return ConnectWithContext(context.Background(), nodeID)
 }
 
 func (d *DSNet) Close() error {
@@ -113,52 +112,70 @@ func (d *DSNet) listen() {
 	}
 }
 
-// Recv reads a message from the Inbox channel.
-func (d *DSNet) Recv() (*pb.Envelope, bool) {
-	env, ok := <-d.Inbox
-	return env, ok
-<<<<<<< HEAD
-}
-=======
+// Broadcast sends a message to all nodes.
+func (d *DSNet) Broadcast(msg string) error {
+	env := &pb.Envelope{
+		From:    d.NodeID,
+		Payload: msg,
+		Type:    pb.MessageType_BROADCAST,
+	}
+	return d.stream.Send(&pb.ClientToController{
+		Payload: &pb.ClientToController_Outbound{Outbound: env},
+	})
 }
 
-func (d *DSNet) Send(to string, payload string, msgType pb.MessageType) error {
+// Send sends a direct message to a single node.
+func (d *DSNet) Send(to, msg string) error {
 	env := &pb.Envelope{
 		From:    d.NodeID,
 		To:      to,
-		Payload: payload,
-		Type:    msgType,
+		Payload: msg,
+		Type:    pb.MessageType_DIRECT,
 	}
 	return d.stream.Send(&pb.ClientToController{
-		Payload: &pb.ClientToController_Outbound{
-			Outbound: env,
+		Payload: &pb.ClientToController_Outbound{Outbound: env},
+	})
+}
+
+// Publish sends a message to a group.
+func (d *DSNet) Publish(group, msg string) error {
+	env := &pb.Envelope{
+		From:    d.NodeID,
+		Group:   group,
+		Payload: msg,
+		Type:    pb.MessageType_GROUP,
+	}
+	return d.stream.Send(&pb.ClientToController{
+		Payload: &pb.ClientToController_Outbound{Outbound: env},
+	})
+}
+
+// Subscribe subscribes the node to a group.
+func (d *DSNet) Subscribe(group string) error {
+	return d.stream.Send(&pb.ClientToController{
+		Payload: &pb.ClientToController_Subscribe{
+			Subscribe: &pb.SubscribeReq{
+				NodeId: d.NodeID,
+				Group:  group,
+			},
 		},
 	})
 }
 
-// TODO
-func (d *DSNet) Broadcast(group string, payload string, msgType pb.MessageType) error {
-	return d.Send("", payload, msgType)
+// Unsubscribe unsubscribes the node from a group.
+func (d *DSNet) Unsubscribe(group string) error {
+	return d.stream.Send(&pb.ClientToController{
+		Payload: &pb.ClientToController_Unsubscribe{
+			Unsubscribe: &pb.UnsubscribeReq{
+				NodeId: d.NodeID,
+				Group:  group,
+			},
+		},
+	})
 }
 
-type NodeHandler interface {
-	OnEvent(env *pb.Envelope) []*pb.Envelope
+// Recv reads a message from the Inbox channel.
+func (d *DSNet) Recv() (*pb.Envelope, bool) {
+	env, ok := <-d.Inbox
+	return env, ok
 }
-
-func (d *DSNet) RunAlgo(handler NodeHandler) {
-	for {
-		select {
-		case env, ok := <-d.Inbox:
-			if !ok {
-				return
-			}
-			outgoing := handler.OnEvent(env)
-			for _, msg := range outgoing {
-				_ = d.Send(msg.To, msg.Payload, msg.Type)
-			}
-		case <-d.closeCh:
-			return
-		}
-	}
-}
->>>>>>> main
