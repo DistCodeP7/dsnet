@@ -4,7 +4,7 @@ import (
 	"io"
 	"sync"
 
-	pb "github.com/distcode/dsnet/proto"
+	pb "github.com/DistcodeP7/dsnet/proto"
 )
 
 type ControllerProps struct {
