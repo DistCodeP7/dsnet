@@ -51,17 +51,13 @@ func (c *Controller) ControlStream(stream pb.NetworkController_ControlStreamServ
 		switch payload := in.Payload.(type) {
 		case *pb.ClientToController_Register:
 			nodeID = payload.Register.NodeId
+
 			c.mu.Lock()
 			c.nodes[nodeID] = stream
+
 			c.mu.Unlock()
 			c.log.Printf("Registered node: %s", nodeID)
 			c.sendRegisteredResponse(nodeID)
-
-		case *pb.ClientToController_Subscribe:
-			c.addToGroup(payload.Subscribe.NodeId, payload.Subscribe.Group)
-
-		case *pb.ClientToController_Unsubscribe:
-			c.removeFromGroup(payload.Unsubscribe.NodeId, payload.Unsubscribe.Group)
 
 		case *pb.ClientToController_Outbound:
 			c.forward(payload.Outbound)
@@ -89,60 +85,20 @@ func (c *Controller) sendRegisteredResponse(nodeID string) {
 	}
 }
 
-func (c *Controller) addToGroup(nodeID, group string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.groups[group] == nil {
-		c.groups[group] = make(map[string]struct{})
-	}
-	c.groups[group][nodeID] = struct{}{}
-	c.log.Printf("Node %s subscribed to group %s", nodeID, group)
-}
-
-func (c *Controller) removeFromGroup(nodeID, group string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if _, ok := c.groups[group]; ok {
-		delete(c.groups[group], nodeID)
-		c.log.Printf("Node %s unsubscribed from group %s", nodeID, group)
-	}
-}
-
 func (c *Controller) forward(env *pb.Envelope) {
-	switch env.Type {
-	case pb.MessageType_BROADCAST:
-		c.mu.Lock()
-		defer c.mu.Unlock()
+	c.mu.Lock()
+	dest, ok := c.nodes[env.To]
+	c.mu.Unlock()
+	if !ok {
+		c.log.Printf("Unknown destination: %s", env.To)
+		return
+	}
 
-		for nodeID, stream := range c.nodes {
-			if err := stream.Send(&pb.ControllerToClient{Inbound: env}); err != nil {
-				c.log.Printf("Failed to broadcast to %s: %v", nodeID, err)
-			}
-		}
-		c.log.Printf("Broadcasted from %s: %s", env.From, env.Payload)
-	case pb.MessageType_GROUP:
-		c.mu.Lock()
-		members := c.groups[env.Group]
-		c.mu.Unlock()
-
-		for id := range members {
-			if stream, ok := c.nodes[id]; ok {
-				stream.Send(&pb.ControllerToClient{Inbound: env})
-			}
-		}
-
-	default:
-		c.mu.Lock()
-		dest, ok := c.nodes[env.To]
-		c.mu.Unlock()
-		if !ok {
-			c.log.Printf("Unknown destination: %s", env.To)
-			return
-		}
+	go func() {
 		if err := dest.Send(&pb.ControllerToClient{Inbound: env}); err != nil {
 			c.log.Printf("Failed to send to %s: %v", env.To, err)
 		} else {
 			c.log.Printf("Forwarded %s -> %s: %s", env.From, env.To, env.Payload)
 		}
-	}
+	}()
 }
