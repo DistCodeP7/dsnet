@@ -1,4 +1,4 @@
-module github.com/DistcodeP7/dsnet
+module github.com/distcodep7/dsnet
 
 go 1.24.0
 
