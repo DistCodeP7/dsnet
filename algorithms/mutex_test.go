@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/distcode/dsnet/dsnet"
-	pb "github.com/distcode/dsnet/proto"
-	"github.com/distcode/dsnet/testutils"
+	"github.com/DistCodeP7/dsnet/dsnet"
+	pb "github.com/DistCodeP7/dsnet/proto"
+	"github.com/DistCodeP7/dsnet/testutils"
 )
 
 func TestCentralizedMutex(t *testing.T) {

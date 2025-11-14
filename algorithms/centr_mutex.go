@@ -3,8 +3,8 @@ package algorithms
 import (
 	"sync"
 
-	"github.com/distcode/dsnet/dsnet"
-	pb "github.com/distcode/dsnet/proto"
+	"github.com/DistCodeP7/dsnet/dsnet"
+	pb "github.com/DistCodeP7/dsnet/proto"
 )
 
 // An implementation of a token-based centralized mutex algorithm

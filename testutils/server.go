@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/distcode/dsnet/controller"
-	pb "github.com/distcode/dsnet/proto"
+	"github.com/DistCodeP7/dsnet/controller"
+	pb "github.com/DistCodeP7/dsnet/proto"
 
 	"google.golang.org/grpc"
 )

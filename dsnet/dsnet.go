@@ -6,7 +6,7 @@ import (
 	"log"
 	"sync"
 
-	pb "github.com/distcode/dsnet/proto"
+	pb "github.com/DistCodeP7/dsnet/proto"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"

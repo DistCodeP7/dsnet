@@ -3,8 +3,8 @@ package dsnet
 import (
 	"testing"
 
-	pb "github.com/distcode/dsnet/proto"
-	"github.com/distcode/dsnet/testutils"
+	pb "github.com/DistCodeP7/dsnet/proto"
+	"github.com/DistCodeP7/dsnet/testutils"
 )
 
 func TestClientMessaging(t *testing.T) {
