@@ -10,10 +10,12 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /controller ./main.go
 FROM golang:1.25-alpine as base
 WORKDIR /app
 COPY --from=builder /go/src/github.com/distcodep7/dsnet/ ./
+# Pre-compile DSNet dependencies to speed up runtime compilation
+RUN go build -o /tmp/precompile ./dsnet/... || true
 CMD ["sleep", "infinity"]
 
 # Controller image for running the DSNet controller server
 FROM alpine:latest AS controller
 WORKDIR /app
-COPY --from=builder /controller .
-CMD ["./controller"]
+COPY --from=builder /controller ./controller
+CMD ["/app/controller"]

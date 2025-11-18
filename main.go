@@ -7,7 +7,7 @@ import (
 	"github.com/distcodep7/dsnet/controller"
 	pb "github.com/distcodep7/dsnet/proto"
 	"google.golang.org/grpc"
-)	
+)
 
 func main() {
 	ctrl := controller.NewController(controller.ControllerProps{
