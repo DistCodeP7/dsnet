@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log"
+	"os"
 	"sync"
 
 	pb "github.com/distcodep7/dsnet/proto"
@@ -30,7 +31,10 @@ type DSNet struct {
 
 // ConnectWithContext connects a node to the controller with a context.
 func ConnectWithContext(ctx context.Context, nodeID string) (*DSNet, error) {
-	controllerAddr := "dsnet-controller:50051"	
+	controllerAddr := os.Getenv("DSNET_CONTROLLER_ADDR")
+	if controllerAddr == "" {
+		controllerAddr = "dsnet-controller:50051"
+	}
 	clientConn, err := grpc.NewClient(controllerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, err
