@@ -2,6 +2,7 @@ package dsnet
 
 import (
 	"net"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -11,6 +12,11 @@ import (
 
 	"google.golang.org/grpc"
 )
+
+func init() {
+	// Set controller address to localhost for tests
+	os.Setenv("DSNET_CONTROLLER_ADDR", "localhost:50051")
+}
 
 func startTestServer(t *testing.T) (*grpc.Server, net.Listener) {
 	grpcServer := grpc.NewServer()

@@ -3,10 +3,21 @@ WORKDIR /go/src/github.com/distcodep7/dsnet
 COPY . .
 RUN go mod tidy && go mod vendor
 
-FROM golang:1.25-alpine
+# Build controller binary
+RUN CGO_ENABLED=0 GOOS=linux go build -o /controller ./main.go
+
+# Base image for importing DSNet as a library (existing functionality)
+FROM golang:1.25-alpine AS base
 WORKDIR /app
-
-# Copy module root with vendored deps
 COPY --from=builder /go/src/github.com/distcodep7/dsnet/ ./
-
+# Run tests to validate functionality
+RUN go test ./dsnet -v
+# Pre-compile DSNet package for faster runtime compilation
+RUN go build ./dsnet
 CMD ["sleep", "infinity"]
+
+# Controller image for running the DSNet controller server
+FROM alpine:latest AS controller
+WORKDIR /app
+COPY --from=builder /controller ./controller
+CMD ["/app/controller"]

@@ -2,12 +2,13 @@ name: ci
 
 on:
   workflow_dispatch:
-  pull_request:
+  push:
     branches: "main"
 
 jobs:
   docker:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -25,13 +26,26 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push Docker image
+      - name: Build and push DSNet worker image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
+          target: base
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
             ghcr.io/distcodep7/dsnet:latest
             ghcr.io/distcodep7/dsnet:${{ github.sha }}
+
+      - name: Build and push DSNet controller image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          target: controller
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/distcodep7/dsnet-controller:latest
+            ghcr.io/distcodep7/dsnet-controller:${{ github.sha }}
