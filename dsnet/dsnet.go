@@ -107,7 +107,11 @@ func (d *DSNet) listen() {
 				}
 				continue
 			}
-			d.Inbox <- in.Inbound
+			select {
+			case d.Inbox <- in.Inbound:
+			default:
+				log.Printf("[%s] Inbox full, dropping message", d.NodeID)
+			}
 		}
 	}
 }

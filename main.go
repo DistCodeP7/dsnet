@@ -11,7 +11,7 @@ import (
 
 func main() {
 	ctrl := controller.NewController(controller.ControllerProps{
-		Logger: &controller.NoOpLogger{},
+		Logger: log.Default(), // Use the standard library logger for production
 	})
 
 	lis, err := net.Listen("tcp", ":50051")

@@ -11,7 +11,7 @@ FROM golang:1.25-alpine as base
 WORKDIR /app
 COPY --from=builder /go/src/github.com/distcodep7/dsnet/ ./
 # Pre-compile DSNet dependencies to speed up runtime compilation
-RUN go build -o /tmp/precompile ./dsnet/... || true
+RUN go build -o /tmp/precompile ./dsnet/...
 CMD ["sleep", "infinity"]
 
 # Controller image for running the DSNet controller server
