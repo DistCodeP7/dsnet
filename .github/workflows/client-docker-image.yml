@@ -10,6 +10,7 @@ on:
 jobs:
   docker:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -32,6 +33,7 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
+          target: base
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
