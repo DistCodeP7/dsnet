@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package dsnet;
+option go_package = "github.com/distcodep7/dsnet/proto";
+
+service NetworkController {
+  // Bidirectional streaming for real-time messaging
+  rpc Stream(stream Envelope) returns (stream Envelope);
+}
+
+message Envelope {
+  string from = 1;
+  string to = 2;
+  string type = 3;      // e.g., "LOCK_REQ", "HANDSHAKE"
+  string payload = 4;   // JSON data
+}

@@ -4,9 +4,9 @@ COPY . .
 RUN go mod tidy && go mod vendor
 
 # Build controller binary
-RUN CGO_ENABLED=0 GOOS=linux go build -o /controller ./main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -o /controller ./controller/main.go
 
-# Base image for importing DSNet as a library (existing functionality)
+# Base image for importing DSNet as a library
 FROM golang:1.25-alpine AS base
 WORKDIR /app
 COPY --from=builder /go/src/github.com/distcodep7/dsnet/ ./
