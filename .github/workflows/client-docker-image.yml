@@ -1,4 +1,4 @@
-name: ci
+name: ci-client-docker-image
 
 on:
   workflow_dispatch:
@@ -31,23 +31,9 @@ jobs:
       - name: Build and push DSNet worker image
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: ./Dockerfile
-          target: base
+          context: ./prebundle
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
             ghcr.io/distcodep7/dsnet:latest
             ghcr.io/distcodep7/dsnet:${{ github.sha }}
-
-      - name: Build and push DSNet controller image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile
-          target: controller
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ghcr.io/distcodep7/dsnet-controller:latest
-            ghcr.io/distcodep7/dsnet-controller:${{ github.sha }}
