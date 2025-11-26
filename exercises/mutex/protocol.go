@@ -6,38 +6,36 @@ import "github.com/distcodep7/dsnet/dsnet"
 // 1. EXTERNAL TRIGGERS (The "Input")
 // ==========================================================
 
-// ElectionTrigger is sent by the Tester to start the exercise.
-// The student must listen for type: "ElectionTrigger"
-type ElectionTrigger struct {
-	dsnet.BaseMessage        // Type: "ElectionTrigger"
-	ElectionID        string `json:"election_id"`
+type MutexTrigger struct {
+	dsnet.BaseMessage        // Type: "MutexTrigger"
+	MutexID        string `json:"mutex_id"`
 }
 
 // ==========================================================
 // 2. INTERNAL PROTOCOL (The "Logic")
 // ==========================================================
 
-// RequestVote is sent between nodes to ask for leadership.
-type RequestVote struct {
-	dsnet.BaseMessage     // Type: "RequestVote"
-	Term              int `json:"term"`
-	LastLogIndex      int `json:"last_log_index"`
+// RequestCS is sent between nodes to request access to the critical section.
+type RequestCS struct {
+	dsnet.BaseMessage 		// Type: "RequestCS"
+	MutexID      	string `json:"mutex_id"`
+	Timestamp    	int64  `json:"timestamp"`
 }
 
-// VoteResponse is the reply to a RequestVote.
-type VoteResponse struct {
-	dsnet.BaseMessage      // Type: "VoteResponse"
-	Term              int  `json:"term"`
-	Granted           bool `json:"granted"`
+// ReplyCS is the reply to a RequestCS.
+type ReplyCS struct {
+	dsnet.BaseMessage // Type: "ReplyCS"
+	MutexID      	string `json:"mutex_id"`
+	Granted	 		bool   `json:"granted"`
 }
 
 // ==========================================================
 // 3. EXTERNAL RESULTS (The "Output")
 // ==========================================================
 
-type ElectionResult struct {
+type MutexResult struct {
 	dsnet.BaseMessage
-	ElectionID string `json:"election_id"`
-	Success    bool   `json:"success"`
-	LeaderID   string `json:"leader_id"`
+	MutexID string `json:"mutex_id"`
+	NodeId  string `json:"node_id"` // Node that finished its CS execution
+	Success bool   `json:"success"` // True if mutual exclusion and progress were maintained
 }
