@@ -1,4 +1,4 @@
-name: ci-client-docker-image
+name: ci-controller-docker-image
 
 on:
   workflow_dispatch:
@@ -6,6 +6,7 @@ on:
     branches: ["main"]
   push:
     branches: ["main"]
+
 
 jobs:
   docker:
@@ -29,12 +30,13 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push DSNet worker image
+      - name: Build and push DSNet controller image
         uses: docker/build-push-action@v6
         with:
-          context: ./prebundle
+          context: .
+          target: controller
           platforms: linux/amd64,linux/arm64
           push: ${{ github.ref == 'refs/heads/main' }}
           tags: |
-            ghcr.io/distcodep7/dsnet:latest
-            ghcr.io/distcodep7/dsnet:${{ github.sha }}
+            ghcr.io/distcodep7/dsnet-controller:latest
+            ghcr.io/distcodep7/dsnet-controller:${{ github.sha }}
