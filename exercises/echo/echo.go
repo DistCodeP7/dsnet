@@ -9,13 +9,19 @@ import "github.com/distcodep7/dsnet/dsnet"
 // SendTrigger sends a trigger message to a single node to start the echo process.
 type SendTrigger struct {
 	dsnet.BaseMessage      // Type: "SendTrigger"
-	EchoID        string `json:"echo_id"`
-	Content      string `json:"content"`
+	EchoID 				string `json:"echo_id"`
+	Content      		string `json:"content"`
 }
 
 // ==========================================================
 // 2. INTERNAL PROTOCOL (The "Logic")
 // ==========================================================
+
+type EchoMessage struct {
+	dsnet.BaseMessage     // Type: "EchoMessage"
+	EchoID		 		string `json:"echo_id"`
+	Content         	string `json:"content"`
+}
 
 // EchoResponse is sent from each receiving node back to the original sender.
 type EchoResponse struct {
@@ -32,6 +38,6 @@ type EchoResponse struct {
 // after it has received an EchoResponse from every other node.
 type ReplyReceived struct {
 	dsnet.BaseMessage
-	EchoID string `json:"echo_id"`
-	Success bool   `json:"success"`
+	EchoID 				string `json:"echo_id"`
+	Success 			bool `json:"success"`
 }
