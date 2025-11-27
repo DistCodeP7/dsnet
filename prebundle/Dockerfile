@@ -8,11 +8,12 @@ WORKDIR /app/tmp
 
 RUN go mod init distcode
 
+# 2. Warm up the cache
 COPY warmup/modules.go .
 RUN go mod tidy && go mod download && rm modules.go
 
 
-COPY wait_signal.go .
-RUN go build -o wait_signal wait_signal.go
+COPY wrapper.go .
+RUN go build -o wrapper ./wrapper.go && rm wrapper.go
 
-CMD ["./wait_signal"]
+CMD ["./wrapper", "cmd", "./prog"]
