@@ -4,7 +4,7 @@ COPY . .
 RUN go mod tidy && go mod vendor
 
 # Build controller binary
-RUN CGO_ENABLED=0 GOOS=linux go build -o /controller ./controller/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -o /controller ./controller/controller.go
 
 # Controller image for running the DSNet controller server
 FROM alpine:latest AS controller
