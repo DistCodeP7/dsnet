@@ -17,6 +17,8 @@ var (
 	cmdPath     string
 	mu          sync.Mutex
 	currentProc *exec.Cmd
+	cancelFunc  context.CancelFunc
+	srv         *http.Server
 )
 
 func Start(w http.ResponseWriter, _ *http.Request) {
@@ -65,6 +67,16 @@ func Stop(w http.ResponseWriter, _ *http.Request) {
 	fmt.Fprintln(w, "Process stopped")
 }
 
+func Shutdown(w http.ResponseWriter, _ *http.Request) {
+	// Fully terminate both student and wrapper
+	mu.Lock()
+	stopProcess()
+	mu.Unlock()
+
+	fmt.Fprintln(w, "Wrapper shutting down...")
+	cancelFunc() // triggers shutdown in main()
+}
+
 func startProcess() error {
 	currentProc = exec.Command(cmdPath)
 	currentProc.Stdout = os.Stdout
@@ -76,7 +88,6 @@ func startProcess() error {
 	}
 
 	go func() {
-		// Wait for the process to finish
 		err := currentProc.Wait()
 		mu.Lock()
 		defer mu.Unlock()
@@ -96,7 +107,6 @@ func stopProcess() {
 		return
 	}
 
-	// Try graceful termination first
 	currentProc.Process.Signal(syscall.SIGTERM)
 
 	done := make(chan struct{})
@@ -127,13 +137,14 @@ func main() {
 	fmt.Println("Starting wrapper for:", cmdPath)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	cancelFunc = cancel
 
-	srv := &http.Server{Addr: ":8090"}
+	srv = &http.Server{Addr: ":8090"}
 
 	http.HandleFunc("/start", Start)
 	http.HandleFunc("/reset", Reset)
 	http.HandleFunc("/stop", Stop)
+	http.HandleFunc("/shutdown", Shutdown)
 
 	go func() {
 		fmt.Println("Server running on :8090")
@@ -143,7 +154,6 @@ func main() {
 		}
 	}()
 
-	// Listen for signals
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 
@@ -151,17 +161,13 @@ func main() {
 	case <-sigCh:
 		fmt.Println("Received termination signal, shutting down...")
 	case <-ctx.Done():
-		fmt.Println("Context canceled, shutting down...")
+		fmt.Println("Shutdown requested...")
 	}
 
-	// Shutdown HTTP server gracefully
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		fmt.Println("Error shutting down server:", err)
-	}
+	srv.Shutdown(shutdownCtx)
 
-	// Stop the running process if any
 	mu.Lock()
 	stopProcess()
 	mu.Unlock()

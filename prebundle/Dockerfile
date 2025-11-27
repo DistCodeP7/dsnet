@@ -6,14 +6,12 @@ ENV GO111MODULE=on \
 
 WORKDIR /app/tmp
 
-RUN go mod init distcode
-
-# 2. Warm up the cache
 COPY warmup/modules.go .
-RUN go mod tidy && go mod download && rm modules.go
-
-
 COPY wrapper.go .
-RUN go build -o wrapper ./wrapper.go && rm wrapper.go
+
+RUN apk add --no-cache curl ca-certificates && \
+  go mod init distcode && \
+  go mod tidy && go mod download && rm modules.go  && \
+  go build -o wrapper ./wrapper.go && rm wrapper.go
 
 CMD ["./wrapper", "cmd", "./prog"]
