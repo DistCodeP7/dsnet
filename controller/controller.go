@@ -1,4 +1,4 @@
-package main
+package controller
 
 import (
 	"io"
@@ -116,7 +116,7 @@ func (s *Server) CreatePartition(group1, group2 []string) {
 	}
 }
 
-func main() {
+func Serve() {
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
