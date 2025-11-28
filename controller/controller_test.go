@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math/rand"
 	"testing"
 
 	pb "github.com/distcodep7/dsnet/proto"
@@ -100,4 +101,67 @@ func TestForward_UnknownDestination(t *testing.T) {
 		}
 	}()
 	s.forward(env)
+}
+
+// Test probCheck behavior for edge cases and approximate probability.
+// Uses a deterministic RNG so tests are stable.
+func TestProbCheck(t *testing.T) {
+	// rand.NewSource(1) produces a deterministic sequence.
+	// First Float64() ≈ 0.604660…
+	s := &Server{rng: newTestRNG()}
+
+	// p = 0 → always false
+	if s.probCheck(0) {
+		t.Fatalf("expected probCheck(0) = false")
+	}
+
+	// Reset RNG so next call uses the same first Float64
+	s.rng = newTestRNG()
+	if !s.probCheck(1) { // 1.0 is max valid probability
+		t.Fatalf("expected probCheck(1) = true")
+	}
+
+	// Reset and test a middle value
+	s.rng = newTestRNG()
+	r := s.rng.Float64() // save expected value
+	s.rng = newTestRNG() // restore state
+
+	p := 0.7
+	got := s.probCheck(p)
+	expected := r < p
+	if got != expected {
+		t.Fatalf("probCheck(%v) = %v, expected %v (r=%v)", p, got, expected, r)
+	}
+}
+
+//testRandIntn returns a deterministic random int for testing.
+func TestRandIntn(t *testing.T) {
+	s := &Server{rng: newTestRNG()}
+
+	got := s.randIntn(10)
+	if got != 1 {
+		t.Fatalf("randIntn(10) = %d, expected 1", got)
+	}
+
+	// Next Intn(10) from the same RNG should be deterministic as well.
+	got2 := s.randIntn(10)
+	if got2 != 7 {
+		t.Fatalf("second randIntn(10) = %d, expected 7", got2)
+	}
+}
+
+func TestRandIntn_PanicsWithoutRNG(t *testing.T) {
+	s := &Server{}
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("expected panic, got none")
+		}
+	}()
+
+	s.randIntn(5)
+}
+
+func newTestRNG() *rand.Rand {
+	return rand.New(rand.NewSource(1))
 }
