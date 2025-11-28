@@ -35,12 +35,6 @@ type TestConfig struct {
 	ReorderMaxDelay int
 }
 
-type ServerConfig struct {
-	testCfg TestConfig
-	addr string
-	rng  *rand.Rand
-}
-
 type Server struct {
 	pb.UnimplementedNetworkControllerServer
 
@@ -53,37 +47,24 @@ type Server struct {
 	testConfig  TestConfig
 }
 
-func (sc ServerConfig) WithTestConfig(tc TestConfig) ServerConfig {
-	sc.testCfg = tc
-	return sc
-}
-
-func NewTestConfig() TestConfig {
+func NewTestConfig(dropp, reordp, dupep float64, asyncDup bool, reordMin, reordMax int) TestConfig {
 	return TestConfig{
-		DropProb:       	0,
-		ReorderProb:  		0,
-		DupeProb:       	0,
-		AsyncDuplicate: 	true,
-		ReorderMinDelay: 	0,
-		ReorderMaxDelay: 	0,
+		DropProb:       	dropp,
+		ReorderProb:  		reordp,
+		DupeProb:       	dupep,
+		AsyncDuplicate: 	asyncDup,
+		ReorderMinDelay: 	reordMin,
+		ReorderMaxDelay: 	reordMax,
 	}
 }
 
-func NewServerConfig(addr string, testCfg TestConfig) ServerConfig {
-	return ServerConfig{
-		addr:    addr,
-		rng:     rand.New(rand.NewSource(time.Now().UnixNano())),
-		testCfg: testCfg,
-	}
-}
-
-func NewServer(cfg ServerConfig) *Server {
+func NewServer(cfg TestConfig) *Server {
 	return &Server{
 		nodes:      make(map[string]*Node),
 		senders:    make(map[string]sender),
 		blocked:    make(map[string]map[string]bool),
-		rng:        cfg.rng,
-		testConfig: cfg.testCfg,
+		rng:        rand.New(rand.NewSource(time.Now().UnixNano())),
+		testConfig: cfg,
 	}
 }
 
@@ -221,8 +202,8 @@ func (s *Server) CreatePartition(group1, group2 []string) {
 	}
 }
 
-func Serve(cfg ServerConfig) {
-	lis, err := net.Listen("tcp", cfg.addr)
+func Serve(cfg TestConfig) {
+	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}

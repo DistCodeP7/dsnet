@@ -117,7 +117,6 @@ func (s *Server) ReorderMessage(msg *pb.Envelope) (bool, error) {
 // handleMessageEvents processes message events (drop, duplicate, reorder).
 // It returns (true, nil) if the message delivery should be skipped (dropped or scheduled for later).
 func (s *Server) handleMessageEvents(msg *pb.Envelope) (bool, error) {
-	//DROP
 	if s.probCheck(s.testConfig.DropProb) {
 		if err := s.DropMessage(msg); err != nil {
 			return false, fmt.Errorf("[DROP ERR] %v", err)
@@ -125,7 +124,6 @@ func (s *Server) handleMessageEvents(msg *pb.Envelope) (bool, error) {
 		return true, nil
 	}
 
-	//DUPLICATE
 	if s.probCheck(s.testConfig.DupeProb) {
 		if err := s.DuplicateMessage(msg); err != nil {
 			return false, fmt.Errorf("[DUPE ERR] %v", err)
@@ -133,7 +131,6 @@ func (s *Server) handleMessageEvents(msg *pb.Envelope) (bool, error) {
 		return false, nil
 	}
 
-	//REORDER
 	if s.probCheck(s.testConfig.ReorderProb) {
 		scheduled, err := s.ReorderMessage(msg)
 		if err != nil {
