@@ -11,7 +11,11 @@ COPY wrapper.go .
 
 RUN apk add --no-cache curl ca-certificates && \
   go mod init distcode && \
-  go mod tidy && go mod download && rm modules.go  && \
-  go build -o wrapper ./wrapper.go && rm wrapper.go
+  go mod tidy && go mod download && \
+  rm modules.go && \
+  go build -o wrapper ./wrapper.go && \
+  rm wrapper.go && \
+  chmod +x wrapper
+
 
 CMD ["./wrapper", "cmd", "./prog"]

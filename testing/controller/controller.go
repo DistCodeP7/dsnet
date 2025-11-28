@@ -129,7 +129,6 @@ func Serve() {
 
 	grpcServer := grpc.NewServer()
 	pb.RegisterNetworkControllerServer(grpcServer, srv)
-
 	log.Println("Controller listening on :50051...")
 
 	if err := grpcServer.Serve(lis); err != nil {
