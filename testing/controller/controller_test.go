@@ -65,6 +65,7 @@ func TestForward_DropsWhenBlocked(t *testing.T) {
 	s := &Server{
 		nodes:   make(map[string]*Node),
 		blocked: make(map[string]map[string]bool),
+		testConfig: TestConfig{},
 	}
 
 	// Put a Node entry for the destination (stream left nil intentionally).
@@ -89,6 +90,7 @@ func TestForward_UnknownDestination(t *testing.T) {
 	s := &Server{
 		nodes:   make(map[string]*Node),
 		blocked: make(map[string]map[string]bool),
+		testConfig: TestConfig{},
 	}
 
 	env := &pb.Envelope{From: "X", To: "NonExistent", Type: "MSG", Payload: "payload"}
