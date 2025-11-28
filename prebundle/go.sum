@@ -2,6 +2,8 @@ github.com/distcodep7/dsnet v0.0.4-0.20251127103619-ecfd85929d70 h1:4XO0sWd2o4rK
 github.com/distcodep7/dsnet v0.0.4-0.20251127103619-ecfd85929d70/go.mod h1:yCr8lm8O6ZYxfn853AbE35gOWbzKvXjLWKcbmOr9V7U=
 github.com/distcodep7/dsnet v0.0.4 h1:VyX5oOK6WQ3p/SeKw+NSAVaYGEFX3Jtkx1GmRB6w20o=
 github.com/distcodep7/dsnet v0.0.4/go.mod h1:yCr8lm8O6ZYxfn853AbE35gOWbzKvXjLWKcbmOr9V7U=
+github.com/distcodep7/dsnet v0.0.5 h1:3ai34BCLUmXra2tf1L2dcal8GWNEfvXUGGNhTHuPzH0=
+github.com/distcodep7/dsnet v0.0.5/go.mod h1:R08fcWhV0O7EEr5YIa12ViBeKEbI1XcuY+W3ZjO/UBw=
 github.com/go-logr/logr v1.4.3 h1:CjnDlHq8ikf6E492q6eKboGOC0T8CDaOvkHCIg8idEI=
 github.com/go-logr/logr v1.4.3/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
 github.com/go-logr/stdr v1.2.2 h1:hSWxHoqTgW2S2qGc0LTAI563KZ5YKYRhT3MFKZMbjag=
