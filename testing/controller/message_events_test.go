@@ -224,6 +224,83 @@ func TestReorderMessage(t *testing.T) {
 	}
 }
 
+// TestReorderMessage_DelayedInterleave tests that a message can be received during another message's delay period.
+func TestReorderMessage_DelayedInterleave(t *testing.T) {
+	tests := []struct {
+		name             string
+		reorderSeconds   int           // must be int because TestConfig uses int
+		reorderDuration  time.Duration // actual delay used for measuring
+		interleaveMsg    *pb.Envelope
+		delayedMsg       *pb.Envelope
+		expectOrder      []string
+	}{
+		{
+			name:            "delayed_then_interleave",
+			reorderSeconds:  1,
+			reorderDuration: 1 * time.Second,
+			delayedMsg:      &pb.Envelope{From: "A", To: "B", Type: "DELAYED", Payload: "{}"},
+			interleaveMsg:   &pb.Envelope{From: "A", To: "B", Type: "IMMEDIATE", Payload: "{}"},
+			expectOrder:     []string{"IMMEDIATE", "DELAYED"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+
+			sendCh := make(chan *pb.Envelope, 10)
+			fs := &fakeSender{sendCh: sendCh}
+
+			s := &Server{
+				senders: map[string]sender{"B": fs},
+				testConfig: TestConfig{
+					ReorderProb:     1.0,            // always reorder
+					ReorderMinDelay: tc.reorderSeconds,
+					ReorderMaxDelay: tc.reorderSeconds,
+				},
+				rng: newTestRNG(),
+			}
+
+			start := time.Now()
+
+			// schedule delayed message
+			skipped, err := s.ReorderMessage(tc.delayedMsg)
+			if err != nil {
+				t.Fatalf("ReorderMessage returned error: %v", err)
+			}
+			if !skipped {
+				t.Fatalf("ReorderMessage should skip immediate delivery")
+			}
+
+			// send immediate message
+			if err := fs.SendEnvelope(tc.interleaveMsg); err != nil {
+				t.Fatalf("interleave send failed: %v", err)
+			}
+
+			// First expected message
+			first := <-sendCh
+			if first.Type != tc.expectOrder[0] {
+				t.Fatalf("expected first=%s, got=%s", tc.expectOrder[0], first.Type)
+			}
+
+			// Second expected message (delayed)
+			select {
+			case second := <-sendCh:
+				if second.Type != tc.expectOrder[1] {
+					t.Fatalf("expected second=%s, got=%s", tc.expectOrder[1], second.Type)
+				}
+
+				elapsed := time.Since(start)
+				if elapsed < tc.reorderDuration {
+					t.Fatalf("delayed message arrived too early: %v < %v", elapsed, tc.reorderDuration)
+				}
+
+			case <-time.After(tc.reorderDuration + 500*time.Millisecond):
+				t.Fatalf("never received delayed message")
+			}
+		})
+	}
+}
+
 func TestHandleMessageEvents(t *testing.T) {
 	msg := &pb.Envelope{From: "A", To: "B", Type: "TEST", Payload: "{}"}
 

@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc"
 )
 
+// sender interface for testing/mocking message sending.
 type sender interface {
 	SendEnvelope(*pb.Envelope) error
 }
@@ -34,6 +35,12 @@ type TestConfig struct {
 	ReorderMaxDelay int
 }
 
+type ServerConfig struct {
+	testCfg TestConfig
+	addr string
+	rng  *rand.Rand
+}
+
 type Server struct {
 	pb.UnimplementedNetworkControllerServer
 
@@ -46,16 +53,37 @@ type Server struct {
 	testConfig  TestConfig
 }
 
-// NewServer creates a Server with configurable RNG and probabilities.
-// If rng is nil, a new rand.Rand will be created with a time-based seed.
-func NewTestConfig(dropProb, reorderProb, dupeProb float64, asyncDupe bool, reorderMinDelay, reorderMaxDelay int) *TestConfig {
-	return &TestConfig{
-		DropProb:       	dropProb,
-		ReorderProb:  		reorderProb,
-		DupeProb:       	dupeProb,
-		AsyncDuplicate: 	asyncDupe,
-		ReorderMinDelay: 	reorderMinDelay,
-		ReorderMaxDelay: 	reorderMaxDelay,
+func (sc ServerConfig) WithTestConfig(tc TestConfig) ServerConfig {
+	sc.testCfg = tc
+	return sc
+}
+
+func NewTestConfig() TestConfig {
+	return TestConfig{
+		DropProb:       	0,
+		ReorderProb:  		0,
+		DupeProb:       	0,
+		AsyncDuplicate: 	true,
+		ReorderMinDelay: 	0,
+		ReorderMaxDelay: 	0,
+	}
+}
+
+func NewServerConfig(addr string, testCfg TestConfig) ServerConfig {
+	return ServerConfig{
+		addr:    addr,
+		rng:     rand.New(rand.NewSource(time.Now().UnixNano())),
+		testCfg: testCfg,
+	}
+}
+
+func NewServer(cfg ServerConfig) *Server {
+	return &Server{
+		nodes:      make(map[string]*Node),
+		senders:    make(map[string]sender),
+		blocked:    make(map[string]map[string]bool),
+		rng:        cfg.rng,
+		testConfig: cfg.testCfg,
 	}
 }
 
@@ -193,30 +221,13 @@ func (s *Server) CreatePartition(group1, group2 []string) {
 	}
 }
 
-func Serve() {
-	lis, err := net.Listen("tcp", ":50051")
+func Serve(cfg ServerConfig) {
+	lis, err := net.Listen("tcp", cfg.addr)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	dropProb := 0.5
-	dupeProb := 0.5
-	asyncDupe := true
-	reorderProb := 0.5
-	reorderMinDelay := 1
-	reorderMaxDelay := 10
-
-	srv := &Server {
-		nodes:          make(map[string]*Node),
-		blocked:        make(map[string]map[string]bool),
-		rng:            rng,
-		testConfig: 	TestConfig{},
-	}
-
-	config := NewTestConfig(dropProb, reorderProb, dupeProb, asyncDupe, reorderMinDelay, reorderMaxDelay)
-
-	srv.testConfig = *config
+	srv := NewServer(cfg)
 
 	grpcServer := grpc.NewServer()
 	pb.RegisterNetworkControllerServer(grpcServer, srv)
