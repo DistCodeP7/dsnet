@@ -1,4 +1,4 @@
-package main
+package controller
 
 import (
 	"fmt"
@@ -193,7 +193,7 @@ func (s *Server) CreatePartition(group1, group2 []string) {
 	}
 }
 
-func main() {
+func Serve() {
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
@@ -220,7 +220,6 @@ func main() {
 
 	grpcServer := grpc.NewServer()
 	pb.RegisterNetworkControllerServer(grpcServer, srv)
-
 	log.Println("Controller listening on :50051...")
 
 	if err := grpcServer.Serve(lis); err != nil {

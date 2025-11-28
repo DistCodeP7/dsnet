@@ -6,13 +6,16 @@ ENV GO111MODULE=on \
 
 WORKDIR /app/tmp
 
-RUN go mod init distcode
-
 COPY warmup/modules.go .
-RUN go mod tidy && go mod download && rm modules.go
+COPY wrapper.go .
+
+RUN apk add --no-cache curl ca-certificates && \
+  go mod init distcode && \
+  go mod tidy && go mod download && \
+  rm modules.go && \
+  go build -o wrapper ./wrapper.go && \
+  rm wrapper.go && \
+  chmod +x wrapper
 
 
-COPY wait_signal.go .
-RUN go build -o wait_signal wait_signal.go
-
-CMD ["./wait_signal"]
+CMD ["./wrapper", "cmd", "./prog"]
