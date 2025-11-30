@@ -9,6 +9,10 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+func isTesterMsg(msg *pb.Envelope) bool {
+	return msg.From == "TESTER" || msg.To == "TESTER"
+}
+
 //probCheck returns true with probability p.
 func (s *Server) probCheck(p float64) bool {
 	s.rngMu.Lock()
@@ -117,6 +121,11 @@ func (s *Server) ReorderMessage(msg *pb.Envelope) (bool, error) {
 // handleMessageEvents processes message events (drop, duplicate, reorder).
 // It returns (true, nil) if the message delivery should be skipped (dropped or scheduled for later).
 func (s *Server) handleMessageEvents(msg *pb.Envelope) (bool, error) {
+	if isTesterMsg(msg) {
+		// Only manipulate messages to/from TESTER
+		return false, nil
+	}
+	
 	if s.probCheck(s.testConfig.DropProb) {
 		if err := s.DropMessage(msg); err != nil {
 			return false, fmt.Errorf("[DROP ERR] %v", err)
