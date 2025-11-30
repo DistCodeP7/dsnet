@@ -6,15 +6,16 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 
 	pb "github.com/distcodep7/dsnet/proto"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
-
-// --- Public Types (The student must embed BaseMessage) ---
 
 // BaseMessage must be embedded by every exercise-specific message struct.
 // It provides the necessary metadata for the dsnet package to route the message.
@@ -75,6 +76,7 @@ func NewNode(id string, controllerAddr string) (*Node, error) {
 		return nil, fmt.Errorf("handshake failed: %w", err)
 	}
 	log.Printf("[dsnet] Node %s connected to controller.", id)
+	n.listenForSignal()
 
 	// Start the background loop to receive messages from the controller
 	n.wg.Add(1)
@@ -139,6 +141,12 @@ func (n *Node) runRecvLoop() {
 			return
 		}
 
+		if envelope.Type == "STOP" {
+			log.Printf("[dsnet] STOP command received. Shutting down %s", n.ID)
+			n.Close()
+			os.Exit(0)
+		}
+
 		// Push the raw payload onto the student's public inbound channel
 		select {
 		case n.Inbound <- Event{From: envelope.From, To: envelope.To, Type: envelope.Type, Payload: []byte(envelope.Payload)}:
@@ -147,4 +155,16 @@ func (n *Node) runRecvLoop() {
 			log.Printf("[dsnet] WARNING: Inbound channel full. Dropping message from %s.", envelope.From)
 		}
 	}
+}
+
+func (n *Node) listenForSignal() {
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGINT)
+
+	go func() {
+		<-sigs
+		log.Printf("[dsnet] Shutdown signal received for node %s", n.ID)
+		n.Close()
+		os.Exit(0)
+	}()
 }
