@@ -12,8 +12,8 @@ import (
 
 type EchoNode struct{ Net *dsnet.Node }
 
-func NewEchoNode(id, controllerAddr string) *EchoNode {
-	n, err := dsnet.NewNode(id, controllerAddr)
+func NewEchoNode(id string) *EchoNode {
+	n, err := dsnet.NewNode(id, "localhost:50051")
 	if err != nil {
 		log.Fatalf("Failed to create node %s: %v", id, err)
 	}
@@ -21,11 +21,7 @@ func NewEchoNode(id, controllerAddr string) *EchoNode {
 }
 
 func newBaseMessage(from, to, msgType string) dsnet.BaseMessage {
-	return dsnet.BaseMessage{
-		From: from,
-		To:   to,
-		Type: msgType,
-	}
+	return dsnet.BaseMessage{From: from, To: to, Type: msgType}
 }
 
 func (en *EchoNode) Run(ctx context.Context) {
@@ -73,8 +69,7 @@ func (en *EchoNode) handleEvent(ctx context.Context, event dsnet.Event) {
 
 func Solution(ctx context.Context) {
 	for i := 1; i <= 2; i++ {
-		nodeID := fmt.Sprintf("N%d", i)
-		go NewEchoNode(nodeID, "localhost:50051").Run(ctx)
+		go NewEchoNode(fmt.Sprintf("N%d", i)).Run(ctx)
 	}
 
 	<-ctx.Done()
