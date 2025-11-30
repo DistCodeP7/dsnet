@@ -46,7 +46,6 @@ func (en *EchoNode) handleEvent(ctx context.Context, event dsnet.Event) {
 		case "SendTrigger":
 			var msg echo.SendTrigger
 			json.Unmarshal(event.Payload, &msg)
-			fmt.Printf("[%s] ⚡ Trigger received. EchoID: %s, Content: %s\n", en.Net.ID, msg.EchoID, msg.Content)
 
 			if en.pendingReplies == nil {
 				en.pendingReplies = make(map[string]map[string]bool)
@@ -57,7 +56,6 @@ func (en *EchoNode) handleEvent(ctx context.Context, event dsnet.Event) {
 		case "EchoMessage":
 			var msg echo.EchoMessage
 			json.Unmarshal(event.Payload, &msg)
-			fmt.Printf("[%s] 📩 EchoMessage received. EchoID: %s, Content: %s\n", en.Net.ID, msg.EchoID, msg.Content)
 
 			en.Net.Send(ctx, msg.From, echo.EchoResponse{
 				BaseMessage: newBaseMessage(en.Net.ID, msg.From, "EchoResponse"),
@@ -68,7 +66,6 @@ func (en *EchoNode) handleEvent(ctx context.Context, event dsnet.Event) {
 			// Handle EchoResponse
 			var resp echo.EchoResponse
 			json.Unmarshal(event.Payload, &resp)
-			fmt.Printf("[%s] 📩 EchoResponse received. EchoID: %s, From %s, Content: %s\n", en.Net.ID, resp.EchoID, resp.From, resp.Content)
 
 			if en.pendingReplies == nil {
 				en.pendingReplies = make(map[string]map[string]bool)
@@ -94,7 +91,6 @@ func (en *EchoNode) handleEvent(ctx context.Context, event dsnet.Event) {
 					EchoID:      resp.EchoID,
 					Success:     true,
 				})
-				fmt.Printf("[%s] ✅ All EchoResponses received for EchoID: %s. Sent ReplyReceived to TESTER.\n", en.Net.ID, resp.EchoID)
 				delete(en.pendingReplies, resp.EchoID)
 			}
 	}

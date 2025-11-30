@@ -111,7 +111,7 @@ func (s *Server) Stream(stream pb.NetworkController_StreamServer) error {
 			return err
 		}
 
-		log.Printf("[LOG] %s -> %s [%s]: %s", msg.From, msg.To, msg.Type, msg.Payload)
+		log.Printf("[LOG] %s -> %s Lamport [%d] %s: %s", msg.From, msg.To, msg.Lamport, msg.Type, msg.Payload)
 
 		s.forward(msg)
 	}
