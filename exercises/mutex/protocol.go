@@ -35,7 +35,7 @@ type ReplyCS struct {
 
 type MutexResult struct {
 	dsnet.BaseMessage
-	MutexID string `json:"mutex_id"`
-	NodeId  string `json:"node_id"` // Node that finished its CS execution
-	Success bool   `json:"success"` // True if mutual exclusion and progress were maintained
+	MutexID 		string `json:"mutex_id"`
+	NodeId  		string `json:"node_id"` // Node that finished its CS execution
+	Success 		bool   `json:"success"` // True if mutual exclusion and progress were maintained
 }
