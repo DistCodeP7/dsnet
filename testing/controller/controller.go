@@ -41,10 +41,17 @@ type Server struct {
 	mu      	sync.Mutex
 	nodes   	map[string]*Node
 	senders 	map[string]sender
+	observers 	[]chan *ControllerEvent
 	blocked 	map[string]map[string]bool // blocked[A][B] = true means A cannot send to B
 	rng     	*rand.Rand
 	rngMu		sync.Mutex
 	testConfig  TestConfig
+}
+
+type ControllerEvent struct {
+	Kind 	 string // "forward", "inject", "register", "drop", "reorder", "duplicate"
+	Env      *pb.Envelope
+	RecvTime time.Time
 }
 
 func NewTestConfig(dropp, reordp, dupep float64, asyncDup bool, reordMin, reordMax int) TestConfig {
@@ -62,10 +69,65 @@ func NewServer(cfg TestConfig) *Server {
 	return &Server{
 		nodes:      make(map[string]*Node),
 		senders:    make(map[string]sender),
+		observers:  make([]chan *ControllerEvent, 0),
 		blocked:    make(map[string]map[string]bool),
 		rng:        rand.New(rand.NewSource(time.Now().UnixNano())),
 		testConfig: cfg,
 	}
+}
+
+func (s *Server) RegisterObserver(ch chan *ControllerEvent) {
+    s.mu.Lock()
+	defer s.mu.Unlock()
+    s.observers = append(s.observers, ch)
+}
+
+func (s *Server) UnregisterObserver(ch chan *ControllerEvent) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := 0; i < len(s.observers); i++ {
+		if s.observers[i] == ch {
+			s.observers[i] = s.observers[len(s.observers)-1]
+			s.observers = s.observers[:len(s.observers)-1]
+			return
+		}
+	}
+}
+
+func (s *Server) notifyObservers(evt *ControllerEvent) {
+	s.mu.Lock()
+	obs := make([]chan *ControllerEvent, len(s.observers))
+	copy(obs, s.observers)
+	s.mu.Unlock()
+
+	for _, ch := range obs {
+		select {
+		case ch <- evt:
+		default:
+			// drop if observer not keeping up
+		}
+	}
+}
+
+func (s *Server) InjectEnvelope(env *pb.Envelope) error {
+	s.mu.Lock()
+	target, ok := s.nodes[env.To]
+	s.mu.Unlock()
+	evt := &ControllerEvent{
+		Kind:     "Inject",
+		Env: env,
+		RecvTime: time.Now(),
+	}
+	s.notifyObservers(evt)
+
+	if !ok {
+		return fmt.Errorf("unknown target: %s", env.To)
+	}
+
+	if err := target.send(env); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (n *Node) send(env *pb.Envelope) error {
@@ -154,6 +216,12 @@ func (s *Server) forward(msg *pb.Envelope) {
 		// message delivery intentionally skipped (dropped or scheduled)
 		return
 	}
+
+	if err := target.send(msg); err != nil {
+		log.Printf("[ERR] send failed: %v", err)
+	}
+
+	s.notifyObservers(&ControllerEvent{Kind: "Forward", Env: msg, RecvTime: time.Now()})
 
 	if err := target.send(msg); err != nil {
 		log.Printf("[ERR] send failed: %v", err)
