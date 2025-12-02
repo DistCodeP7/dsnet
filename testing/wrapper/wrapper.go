@@ -49,6 +49,18 @@ func (wm *WrapperManager) Shutdown(ctx context.Context, node Alias) error {
 	return wm.call(ctx, node, "shutdown")
 }
 
+// Checks whether the binary on the specified node is ready.
+// This assumes the wrapper exposes a /ready endpoint that returns 2xx when ready.
+func (wm *WrapperManager) Ready(ctx context.Context, node Alias) error {
+	return wm.call(ctx, node, "ready")
+}
+
+// Checks whether the binary on all managed nodes is ready.
+// Returns a map from node alias to any error returned by the /ready endpoint.
+func (wm *WrapperManager) ReadyAll(ctx context.Context) map[Alias]error {
+	return wm.parallel(ctx, wm.ManagedNodes, wm.Ready)
+}
+
 // Starts the binary on all managed nodes.
 func (wm *WrapperManager) StartAll(ctx context.Context) map[Alias]error {
 	return wm.parallel(ctx, wm.ManagedNodes, wm.Start)
