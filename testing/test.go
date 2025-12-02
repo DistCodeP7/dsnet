@@ -29,7 +29,7 @@ func main() {
 	go controller.Serve(controller.TestConfig{
 		DropProb:        0,   
 		DupeProb:        0,   
-		ReorderProb:     0.5,   
+		ReorderProb:     0,   
 		ReorderMinDelay: 1,
 		ReorderMaxDelay: 2,
 		AsyncDuplicate:  true,

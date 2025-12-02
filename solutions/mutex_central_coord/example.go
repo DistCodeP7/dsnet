@@ -70,15 +70,15 @@ func handleEvent(ctx context.Context, en *MutexNode, st *state, event dsnet.Even
 			for _, id := range st.allNodes {
 				if id == en.Net.ID { continue }
 				t := ex.MutexTrigger{ BaseMessage: dsnet.BaseMessage{ From: en.Net.ID, To: id, Type: "MutexTrigger" }, MutexID: st.mutexID, WorkMillis: st.workMillis }
-				en.Net.Send(context.Background(), id, t)
+				en.Net.Send(ctx, id, t)
 			}
 			// Coordinator takes its own turn first
 			st.inCS = true
-			doCoordinatorCS(en, st)
+			doCoordinatorCS(ctx, en, st)
 		} else {
 			// Send request to coordinator N1 and wait for grant
 			req := ex.RequestCS{ BaseMessage: dsnet.BaseMessage{ From: en.Net.ID, To: "N1", Type: "RequestCS" }, MutexID: st.mutexID }
-			en.Net.Send(context.Background(), "N1", req)
+			en.Net.Send(ctx, "N1", req)
 			st.waitingGrant = true
 		}
 
@@ -86,7 +86,7 @@ func handleEvent(ctx context.Context, en *MutexNode, st *state, event dsnet.Even
 		if !st.isCoordinator { return }
 		var req ex.RequestCS
 		if err := json.Unmarshal(event.Payload, &req); err != nil { return }
-		handleCoordinatorRequest(en, st, req.From, req.MutexID)
+		handleCoordinatorRequest(ctx, en, st, req.From, req.MutexID)
 
 	case "ReplyCS":
 		if st.isCoordinator { return }
@@ -95,12 +95,12 @@ func handleEvent(ctx context.Context, en *MutexNode, st *state, event dsnet.Even
 		if !st.waitingGrant { return }
 		if rep.Granted {
 			st.waitingGrant = false
-			doClientCS(en, st)
+			doClientCS(ctx, en, st)
 		} else {
 			// Backoff and retry
 			time.Sleep(100 * time.Millisecond)
 			req := ex.RequestCS{ BaseMessage: dsnet.BaseMessage{ From: en.Net.ID, To: "N1", Type: "RequestCS" }, MutexID: st.mutexID }
-			en.Net.Send(context.Background(), "N1", req)
+			en.Net.Send(ctx, "N1", req)
 		}
 
 	case "ReleaseCS":
@@ -111,58 +111,58 @@ func handleEvent(ctx context.Context, en *MutexNode, st *state, event dsnet.Even
 		st.completed[event.From] = true
 		if len(st.completed) >= len(st.allNodes) {
 			res := ex.MutexResult{ BaseMessage: dsnet.BaseMessage{ From: en.Net.ID, To: "TESTER", Type: "MutexResult" }, MutexID: st.mutexID, NodeId: en.Net.ID, Success: true }
-			en.Net.Send(context.Background(), "TESTER", res)
+			en.Net.Send(ctx, "TESTER", res)
 			return
 		}
-		grantNext(en, st)
+		grantNext(ctx, en, st)
 	}
 }
 
-func handleCoordinatorRequest(en *MutexNode, st *state, from string, mutexID string) {
+func handleCoordinatorRequest(ctx context.Context, en *MutexNode, st *state, from string, mutexID string) {
 	// If free and no holder, grant immediately; else deny now and enqueue
 	if !st.inCS && st.holder == "" {
 		st.inCS = true
 		st.holder = from
 		rep := ex.ReplyCS{ BaseMessage: dsnet.BaseMessage{ From: en.Net.ID, To: from, Type: "ReplyCS" }, MutexID: mutexID, Granted: true }
-		en.Net.Send(context.Background(), from, rep)
+		en.Net.Send(ctx, from, rep)
 		return
 	}
 	// enqueue and send denial
 	st.queue = append(st.queue, from)
 	rep := ex.ReplyCS{ BaseMessage: dsnet.BaseMessage{ From: en.Net.ID, To: from, Type: "ReplyCS" }, MutexID: mutexID, Granted: false }
-	en.Net.Send(context.Background(), from, rep)
+	en.Net.Send(ctx, from, rep)
 }
 
-func grantNext(en *MutexNode, st *state) {
+func grantNext(ctx context.Context, en *MutexNode, st *state) {
 	if st.inCS || len(st.queue) == 0 { return }
 	next := st.queue[0]
 	st.queue = st.queue[1:]
 	st.inCS = true
 	st.holder = next
 	rep := ex.ReplyCS{ BaseMessage: dsnet.BaseMessage{ From: en.Net.ID, To: next, Type: "ReplyCS" }, MutexID: st.mutexID, Granted: true }
-	en.Net.Send(context.Background(), next, rep)
+	en.Net.Send(ctx, next, rep)
 }
 
-func doClientCS(en *MutexNode, st *state) {
+func doClientCS(ctx context.Context, en *MutexNode, st *state) {
 	// Simulate CS
 	time.Sleep(time.Duration(st.workMillis) * time.Millisecond)
 	// Release to coordinator
 	rel := ex.ReleaseCS{ BaseMessage: dsnet.BaseMessage{ From: en.Net.ID, To: "N1", Type: "ReleaseCS" }, MutexID: st.mutexID }
-	en.Net.Send(context.Background(), "N1", rel)
+	en.Net.Send(ctx, "N1", rel)
 	// Report completion to tester
 	res := ex.MutexResult{ BaseMessage: dsnet.BaseMessage{ From: en.Net.ID, To: "TESTER", Type: "MutexResult" }, MutexID: st.mutexID, NodeId: en.Net.ID, Success: true }
-	en.Net.Send(context.Background(), "TESTER", res)
+	en.Net.Send(ctx, "TESTER", res)
 }
 
-func doCoordinatorCS(en *MutexNode, st *state) {
+func doCoordinatorCS(ctx context.Context, en *MutexNode, st *state) {
 	// Coordinator own CS
 	time.Sleep(time.Duration(st.workMillis) * time.Millisecond)
 	st.inCS = false
 	st.holder = ""
 	// Coordinator also reports its own completion
 	res := ex.MutexResult{ BaseMessage: dsnet.BaseMessage{ From: en.Net.ID, To: "TESTER", Type: "MutexResult" }, MutexID: st.mutexID, NodeId: en.Net.ID, Success: true }
-	en.Net.Send(context.Background(), "TESTER", res)
-	grantNext(en, st)
+	en.Net.Send(ctx, "TESTER", res)
+	grantNext(ctx, en, st)
 }
 
 func Solution(ctx context.Context, numNodes int) {
