@@ -32,6 +32,7 @@ type Event struct {
 	To      string // Recipient's Node ID
 	Type    string // Protocol Type (e.g., "RequestVote", "Commit")
 	Payload []byte // Raw JSON payload of the message
+	Lamport uint64  // Lamport timestamp of the message
 }
 
 // Node is the student's entry point to the distributed network.
@@ -46,6 +47,10 @@ type Node struct {
 	stream pb.NetworkController_StreamClient
 	conn   *grpc.ClientConn
 	wg     sync.WaitGroup
+
+	// Lamport clock
+	lamMu   sync.Mutex
+	lamport uint64
 }
 
 // NewNode initializes the network connection, performs the handshake, and
@@ -75,7 +80,6 @@ func NewNode(id string, controllerAddr string) (*Node, error) {
 		n.Close()
 		return nil, fmt.Errorf("handshake failed: %w", err)
 	}
-	log.Printf("[dsnet] Node %s connected to controller.", id)
 	n.listenForSignal()
 
 	// Start the background loop to receive messages from the controller
@@ -109,12 +113,18 @@ func (n *Node) Send(ctx context.Context, dest string, msg interface{}) error {
 		return fmt.Errorf("send error: message must be valid JSON and embed BaseMessage: %w", err)
 	}
 
+	n.lamMu.Lock()
+	n.lamport = n.lamport + 1
+	lam := n.lamport
+	n.lamMu.Unlock()
+
 	// 3. Create the final Envelope
 	envelope := &pb.Envelope{
 		From:    n.ID,
 		To:      dest,
 		Type:    base.Type,
 		Payload: string(payloadBytes),
+		Lamport: lam,
 	}
 
 	// 4. Send on the gRPC stream
@@ -122,7 +132,7 @@ func (n *Node) Send(ctx context.Context, dest string, msg interface{}) error {
 		return fmt.Errorf("send error: gRPC stream failed: %w", err)
 	}
 
-	log.Printf("[dsnet] Sent %s to %s", base.Type, dest)
+	log.Printf("[dsnet] Sent %s to %s (lamport %d)", base.Type, dest, lam)
 	return nil
 }
 
@@ -141,6 +151,16 @@ func (n *Node) runRecvLoop() {
 			return
 		}
 
+		incoming := envelope.Lamport
+		n.lamMu.Lock()
+		if incoming >= n.lamport {
+            n.lamport = incoming + 1
+        } else {
+            n.lamport = n.lamport + 1
+        }
+		local := n.lamport
+		n.lamMu.Unlock()
+
 		if envelope.Type == "STOP" {
 			log.Printf("[dsnet] STOP command received. Shutting down %s", n.ID)
 			n.Close()
@@ -149,8 +169,8 @@ func (n *Node) runRecvLoop() {
 
 		// Push the raw payload onto the student's public inbound channel
 		select {
-		case n.Inbound <- Event{From: envelope.From, To: envelope.To, Type: envelope.Type, Payload: []byte(envelope.Payload)}:
-			log.Printf("[dsnet] Received %s from %s", envelope.Type, envelope.From)
+		case n.Inbound <- Event{From: envelope.From, To: envelope.To, Type: envelope.Type, Payload: []byte(envelope.Payload), Lamport: incoming}:
+			log.Printf("[dsnet] Received %s from %s (Lamport incoming %d, local %d)", envelope.Type, envelope.From, incoming, local)
 		default:
 			log.Printf("[dsnet] WARNING: Inbound channel full. Dropping message from %s.", envelope.From)
 		}

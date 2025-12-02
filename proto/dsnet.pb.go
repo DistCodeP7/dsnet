@@ -25,8 +25,9 @@ type Envelope struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	From          string                 `protobuf:"bytes,1,opt,name=from,proto3" json:"from,omitempty"`
 	To            string                 `protobuf:"bytes,2,opt,name=to,proto3" json:"to,omitempty"`
-	Type          string                 `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`       // e.g., "LOCK_REQ", "HANDSHAKE"
-	Payload       string                 `protobuf:"bytes,4,opt,name=payload,proto3" json:"payload,omitempty"` // JSON data
+	Type          string                 `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`        // e.g., "LOCK_REQ", "HANDSHAKE"
+	Payload       string                 `protobuf:"bytes,4,opt,name=payload,proto3" json:"payload,omitempty"`  // JSON data
+	Lamport       uint64                 `protobuf:"varint,5,opt,name=lamport,proto3" json:"lamport,omitempty"` // Lamport timestamp
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -89,16 +90,24 @@ func (x *Envelope) GetPayload() string {
 	return ""
 }
 
+func (x *Envelope) GetLamport() uint64 {
+	if x != nil {
+		return x.Lamport
+	}
+	return 0
+}
+
 var File_dsnet_proto protoreflect.FileDescriptor
 
 const file_dsnet_proto_rawDesc = "" +
 	"\n" +
-	"\vdsnet.proto\x12\x05dsnet\"\\\n" +
+	"\vdsnet.proto\x12\x05dsnet\"v\n" +
 	"\bEnvelope\x12\x12\n" +
 	"\x04from\x18\x01 \x01(\tR\x04from\x12\x0e\n" +
 	"\x02to\x18\x02 \x01(\tR\x02to\x12\x12\n" +
 	"\x04type\x18\x03 \x01(\tR\x04type\x12\x18\n" +
-	"\apayload\x18\x04 \x01(\tR\apayload2C\n" +
+	"\apayload\x18\x04 \x01(\tR\apayload\x12\x18\n" +
+	"\alamport\x18\x05 \x01(\x04R\alamport2C\n" +
 	"\x11NetworkController\x12.\n" +
 	"\x06Stream\x12\x0f.dsnet.Envelope\x1a\x0f.dsnet.Envelope(\x010\x01B#Z!github.com/distcodep7/dsnet/protob\x06proto3"
 
