@@ -80,7 +80,6 @@ func NewNode(id string, controllerAddr string) (*Node, error) {
 		n.Close()
 		return nil, fmt.Errorf("handshake failed: %w", err)
 	}
-	log.Printf("[dsnet] Node %s connected to controller.", id)
 	n.listenForSignal()
 
 	// Start the background loop to receive messages from the controller

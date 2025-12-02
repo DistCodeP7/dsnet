@@ -96,6 +96,7 @@ func (s *Server) Stream(stream pb.NetworkController_StreamServer) error {
 	}
 	n.alive.Store(true)
 	s.nodes[nodeID] = n
+	s.senders[nodeID] = n
 	s.mu.Unlock()
 
 	log.Printf("[CTRL] Node Registered: %s", nodeID)
@@ -166,6 +167,7 @@ func (s *Server) removeNode(id string) {
 	if exists {
 		n.alive.Store(false)
 		delete(s.nodes, id)
+		delete(s.senders, id)
 	}
 	s.mu.Unlock()
 
