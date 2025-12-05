@@ -38,5 +38,10 @@ jobs:
           tags: |
             ghcr.io/distcodep7/dsnet:latest
             ghcr.io/distcodep7/dsnet:${{ github.sha }}
-          cache-from: type=registry,ref=ghcr.io/distcodep7/dsnet:cache
+          cache-from: type=registry,ref=ghcr.io/distcodep7/dsnet:cache,mode=max
           cache-to: type=registry,ref=ghcr.io/distcodep7/dsnet:cache,mode=max
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+          # Add credentials
+          secrets: |
+            GHCR_TOKEN=${{ secrets.GHCR_PAT }}
