@@ -1,5 +1,5 @@
-github.com/distcodep7/dsnet v0.0.6-0.20251202141135-f8db78c7c6da h1:/mkRpg2eocjuMKV3yFoGEcke93zYiHBvmzQ4SI8+irg=
-github.com/distcodep7/dsnet v0.0.6-0.20251202141135-f8db78c7c6da/go.mod h1:R08fcWhV0O7EEr5YIa12ViBeKEbI1XcuY+W3ZjO/UBw=
+github.com/distcodep7/dsnet v0.0.7-0.20251202235233-7a1c718bd3d9 h1:tfi+xLM9Jvj5Fm6Ri5wyAdgwV34QDun6sK6GCBy+ocY=
+github.com/distcodep7/dsnet v0.0.7-0.20251202235233-7a1c718bd3d9/go.mod h1:R08fcWhV0O7EEr5YIa12ViBeKEbI1XcuY+W3ZjO/UBw=
 github.com/go-logr/logr v1.4.3 h1:CjnDlHq8ikf6E492q6eKboGOC0T8CDaOvkHCIg8idEI=
 github.com/go-logr/logr v1.4.3/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
 github.com/go-logr/stdr v1.2.2 h1:hSWxHoqTgW2S2qGc0LTAI563KZ5YKYRhT3MFKZMbjag=
