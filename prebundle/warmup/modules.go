@@ -5,6 +5,7 @@ package main
 import (
 	_ "github.com/distcodep7/dsnet/dsnet"
 	_ "github.com/distcodep7/dsnet/testing/controller"
+	_ "github.com/distcodep7/dsnet/testing/disttest"
 	_ "github.com/distcodep7/dsnet/testing/wrapper"
 	_ "github.com/google/uuid"
 )
