@@ -1,0 +1,20 @@
+services:
+  A:
+    image: ghcr.io/distcodep7/dsnet:latest
+    command: ./wrapper -cmd "ls"
+    networks:
+      - wrapper-net
+  B:
+    image: ghcr.io/distcodep7/dsnet:latest
+    command: ./wrapper -cmd "ls"
+    networks:
+      - wrapper-net
+  C:
+    image: ghcr.io/distcodep7/dsnet:latest
+    command: ./wrapper -cmd "ls"
+    networks:
+      - wrapper-net
+
+networks:
+  wrapper-net:
+    driver: bridge
