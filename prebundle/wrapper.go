@@ -78,15 +78,8 @@ func Shutdown(w http.ResponseWriter, _ *http.Request) {
 }
 
 func Ready(w http.ResponseWriter, _ *http.Request) {
-	mu.Lock()
-	defer mu.Unlock()
-
-	if currentProc != nil {
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, "Ready")
-	} else {
-		http.Error(w, "Not ready", http.StatusServiceUnavailable)
-	}
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintln(w, "Ready")
 }
 
 func startProcess() error {
