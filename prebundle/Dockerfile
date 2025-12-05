@@ -6,12 +6,16 @@ ENV GO111MODULE=on \
 
 WORKDIR /app/tmp
 
+
 COPY warmup/modules.go .
 COPY wrapper.go .
+COPY go.mod .
+COPY go.sum .
 
 RUN apk add --no-cache curl ca-certificates && \
-  go mod init distcode && \
-  go mod tidy && go mod download && \
+  go get -u github.com/distcodep7/dsnet@main && \
+  go mod tidy && \
+  go mod download && \
   rm modules.go && \
   go build -o wrapper ./wrapper.go && \
   rm wrapper.go && \

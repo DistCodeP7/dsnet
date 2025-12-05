@@ -38,3 +38,6 @@ jobs:
           tags: |
             ghcr.io/distcodep7/dsnet:latest
             ghcr.io/distcodep7/dsnet:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
