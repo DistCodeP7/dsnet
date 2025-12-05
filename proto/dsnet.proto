@@ -13,4 +13,5 @@ message Envelope {
   string to = 2;
   string type = 3;      // e.g., "LOCK_REQ", "HANDSHAKE"
   string payload = 4;   // JSON data
+  uint64 lamport = 5;    // Lamport timestamp
 }
