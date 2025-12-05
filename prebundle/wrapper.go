@@ -77,6 +77,18 @@ func Shutdown(w http.ResponseWriter, _ *http.Request) {
 	cancelFunc() // triggers shutdown in main()
 }
 
+func Ready(w http.ResponseWriter, _ *http.Request) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	if currentProc != nil {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintln(w, "Ready")
+	} else {
+		http.Error(w, "Not ready", http.StatusServiceUnavailable)
+	}
+}
+
 func startProcess() error {
 	currentProc = exec.Command(cmdPath)
 	currentProc.Stdout = os.Stdout
@@ -141,6 +153,7 @@ func main() {
 
 	srv = &http.Server{Addr: ":8090"}
 
+	http.HandleFunc("/ready", Ready)
 	http.HandleFunc("/start", Start)
 	http.HandleFunc("/reset", Reset)
 	http.HandleFunc("/stop", Stop)
