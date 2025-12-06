@@ -78,6 +78,7 @@ func Shutdown(w http.ResponseWriter, _ *http.Request) {
 }
 
 func Ready(w http.ResponseWriter, _ *http.Request) {
+	fmt.Println("READY endpoint hit")
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintln(w, "Ready")
 }
