@@ -18,43 +18,34 @@ import (
 )
 
 // BaseMessage must be embedded by every exercise-specific message struct.
-// It provides the necessary metadata for the dsnet package to route the message.
 type BaseMessage struct {
 	From string `json:"from"`
 	To   string `json:"to"`
-	Type string `json:"type"` // Must be set to the struct name for easy unmarshalling
+	Type string `json:"type"`
 }
 
-// Event represents a message received by the Node. The Payload must be
-// unmarshaled by the student's code according to the message Type.
+// Event represents a message received by the Node.
 type Event struct {
-	From    string // Sender's Node ID
-	To      string // Recipient's Node ID
-	Type    string // Protocol Type (e.g., "RequestVote", "Commit")
-	Payload []byte // Raw JSON payload of the message
-	Lamport uint64  // Lamport timestamp of the message
+	From        string
+	To          string
+	Type        string
+	Payload     []byte
+	VectorClock map[string]uint64
 }
 
-// Node is the student's entry point to the distributed network.
 type Node struct {
 	ID string
 
-	// Public channel where the student's algorithm receives incoming messages.
-	// The student's main loop listens on this channel.
 	Inbound chan Event
 
-	// Internal gRPC components
 	stream pb.NetworkController_StreamClient
 	conn   *grpc.ClientConn
 	wg     sync.WaitGroup
 
-	// Lamport clock
-	lamMu   sync.Mutex
-	lamport uint64
+	vcMu        sync.Mutex
+	vectorClock map[string]uint64
 }
 
-// NewNode initializes the network connection, performs the handshake, and
-// starts the listener goroutine.
 func NewNode(id string, controllerAddr string) (*Node, error) {
 	conn, err := grpc.NewClient(controllerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -69,11 +60,15 @@ func NewNode(id string, controllerAddr string) (*Node, error) {
 	}
 
 	n := &Node{
-		ID:      id,
-		conn:    conn,
-		stream:  stream,
-		Inbound: make(chan Event, 100),
+		ID:          id,
+		conn:        conn,
+		stream:      stream,
+		Inbound:     make(chan Event, 100),
+		vectorClock: make(map[string]uint64),
 	}
+
+	// Initialize own clock
+	n.vectorClock[id] = 0
 
 	// Send Handshake
 	if err := stream.Send(&pb.Envelope{From: id, To: "CTRL", Type: "HANDSHAKE"}); err != nil {
@@ -82,61 +77,56 @@ func NewNode(id string, controllerAddr string) (*Node, error) {
 	}
 	n.listenForSignal()
 
-	// Start the background loop to receive messages from the controller
 	n.wg.Add(1)
 	go n.runRecvLoop()
 
 	return n, nil
 }
 
-// Close gracefully shuts down the network connection and loops.
 func (n *Node) Close() {
-	// Closing the stream and connection will cause runRecvLoop to exit
 	n.stream.CloseSend()
 	n.conn.Close()
 	n.wg.Wait()
 	close(n.Inbound)
 }
 
-// Send wraps the student's Go struct into an Envelope and sends it to the destination.
-// The msg argument MUST embed dsnet.BaseMessage.
 func (n *Node) Send(ctx context.Context, dest string, msg interface{}) error {
-	// 1. Marshal the struct into a raw JSON payload
 	payloadBytes, err := json.Marshal(msg)
 	if err != nil {
 		return fmt.Errorf("send error: failed to marshal struct: %w", err)
 	}
 
-	// 2. Extract Type field from the payload
 	var base BaseMessage
 	if err := json.Unmarshal(payloadBytes, &base); err != nil {
 		return fmt.Errorf("send error: message must be valid JSON and embed BaseMessage: %w", err)
 	}
 
-	n.lamMu.Lock()
-	n.lamport = n.lamport + 1
-	lam := n.lamport
-	n.lamMu.Unlock()
+	// --- VECTOR CLOCK UPDATE START ---
+	n.vcMu.Lock()
+	// 1. Increment own clock on send
+	n.vectorClock[n.ID]++
+	// 2. Create a copy to send
+	currentVec := n.toProtoVector()
+	n.vcMu.Unlock()
+	// --- VECTOR CLOCK UPDATE END ---
 
-	// 3. Create the final Envelope
 	envelope := &pb.Envelope{
 		From:    n.ID,
 		To:      dest,
 		Type:    base.Type,
 		Payload: string(payloadBytes),
-		Lamport: lam,
+		// Send the vector slice
+		Vector: currentVec,
 	}
 
-	// 4. Send on the gRPC stream
 	if err := n.stream.Send(envelope); err != nil {
 		return fmt.Errorf("send error: gRPC stream failed: %w", err)
 	}
 
-	log.Printf("[dsnet] Sent %s to %s (lamport %d)", base.Type, dest, lam)
+	log.Printf("[dsnet] Sent %s to %s (VC: %v)", base.Type, dest, currentVec)
 	return nil
 }
 
-// runRecvLoop continuously receives Envelopes and pushes them onto the public Inbound channel.
 func (n *Node) runRecvLoop() {
 	defer n.wg.Done()
 
@@ -151,26 +141,42 @@ func (n *Node) runRecvLoop() {
 			return
 		}
 
-		incoming := envelope.Lamport
-		n.lamMu.Lock()
-		if incoming >= n.lamport {
-            n.lamport = incoming + 1
-        } else {
-            n.lamport = n.lamport + 1
-        }
-		local := n.lamport
-		n.lamMu.Unlock()
-
 		if envelope.Type == "STOP" {
 			log.Printf("[dsnet] STOP command received. Shutting down %s", n.ID)
 			n.Close()
 			os.Exit(0)
 		}
 
-		// Push the raw payload onto the student's public inbound channel
+		// --- VECTOR CLOCK MERGE START ---
+		incomingVec := n.fromProtoVector(envelope.Vector)
+
+		n.vcMu.Lock()
+		// 1. Merge: VC[i] = max(VC[i], Incoming[i])
+		for id, val := range incomingVec {
+			if val > n.vectorClock[id] {
+				n.vectorClock[id] = val
+			}
+		}
+		// 2. Increment own clock on receive
+		n.vectorClock[n.ID]++
+
+		// Create a copy of state for the user to see
+		stateCopy := make(map[string]uint64)
+		for k, v := range n.vectorClock {
+			stateCopy[k] = v
+		}
+		n.vcMu.Unlock()
+		// --- VECTOR CLOCK MERGE END ---
+
 		select {
-		case n.Inbound <- Event{From: envelope.From, To: envelope.To, Type: envelope.Type, Payload: []byte(envelope.Payload), Lamport: incoming}:
-			log.Printf("[dsnet] Received %s from %s (Lamport incoming %d, local %d)", envelope.Type, envelope.From, incoming, local)
+		case n.Inbound <- Event{
+			From:        envelope.From,
+			To:          envelope.To,
+			Type:        envelope.Type,
+			Payload:     []byte(envelope.Payload),
+			VectorClock: incomingVec, // Passing the sender's clock as context
+		}:
+			log.Printf("[dsnet] Received %s from %s. New State: %v", envelope.Type, envelope.From, stateCopy)
 		default:
 			log.Printf("[dsnet] WARNING: Inbound channel full. Dropping message from %s.", envelope.From)
 		}
@@ -180,11 +186,26 @@ func (n *Node) runRecvLoop() {
 func (n *Node) listenForSignal() {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGINT)
-
 	go func() {
 		<-sigs
-		log.Printf("[dsnet] Shutdown signal received for node %s", n.ID)
 		n.Close()
 		os.Exit(0)
 	}()
+}
+
+// Helpers for Vector Clock conversion
+func (n *Node) toProtoVector() []*pb.VectorClockEntry {
+	var entries []*pb.VectorClockEntry
+	for id, c := range n.vectorClock {
+		entries = append(entries, &pb.VectorClockEntry{Node: id, Counter: c})
+	}
+	return entries
+}
+
+func (n *Node) fromProtoVector(entries []*pb.VectorClockEntry) map[string]uint64 {
+	vec := make(map[string]uint64)
+	for _, e := range entries {
+		vec[e.Node] = e.Counter
+	}
+	return vec
 }
