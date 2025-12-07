@@ -4,14 +4,19 @@ package dsnet;
 option go_package = "github.com/distcodep7/dsnet/proto";
 
 service NetworkController {
-  // Bidirectional streaming for real-time messaging
   rpc Stream(stream Envelope) returns (stream Envelope);
+}
+
+// Key-value style for vector clocks
+message VectorClockEntry {
+  string node = 1;
+  uint64 counter = 2;
 }
 
 message Envelope {
   string from = 1;
   string to = 2;
-  string type = 3;      // e.g., "LOCK_REQ", "HANDSHAKE"
-  string payload = 4;   // JSON data
-  uint64 lamport = 5;    // Lamport timestamp
+  string type = 3;
+  string payload = 4;
+  repeated VectorClockEntry vector = 5;
 }

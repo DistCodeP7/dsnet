@@ -1,20 +1,22 @@
 package controller
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"math/rand"
 	"net"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	pb "github.com/distcodep7/dsnet/proto"
+	"github.com/distcodep7/dsnet/testing"
 	"google.golang.org/grpc"
 )
 
-// sender interface for testing/mocking message sending.
 type sender interface {
 	SendEnvelope(*pb.Envelope) error
 }
@@ -27,10 +29,10 @@ type Node struct {
 }
 
 type TestConfig struct {
-	DropProb       	float64
+	DropProb        float64
 	DupeProb        float64
-	AsyncDuplicate 	bool
-	ReorderProb		float64
+	AsyncDuplicate  bool
+	ReorderProb     float64
 	ReorderMinDelay int
 	ReorderMaxDelay int
 }
@@ -38,33 +40,67 @@ type TestConfig struct {
 type Server struct {
 	pb.UnimplementedNetworkControllerServer
 
-	mu      	sync.Mutex
-	nodes   	map[string]*Node
-	senders 	map[string]sender
-	blocked 	map[string]map[string]bool // blocked[A][B] = true means A cannot send to B
-	rng     	*rand.Rand
-	rngMu		sync.Mutex
-	testConfig  TestConfig
+	mu      sync.Mutex
+	nodes   map[string]*Node
+	senders map[string]sender
+	blocked map[string]map[string]bool
+	rng     *rand.Rand
+	rngMu   sync.Mutex
+
+	testConfig TestConfig
+
+	// NEW: File for structural logging
+	logFile *os.File
+	logMu   sync.Mutex
 }
 
 func NewTestConfig(dropp, reordp, dupep float64, asyncDup bool, reordMin, reordMax int) TestConfig {
 	return TestConfig{
-		DropProb:       	dropp,
-		ReorderProb:  		reordp,
-		DupeProb:       	dupep,
-		AsyncDuplicate: 	asyncDup,
-		ReorderMinDelay: 	reordMin,
-		ReorderMaxDelay: 	reordMax,
+		DropProb:        dropp,
+		ReorderProb:     reordp,
+		DupeProb:        dupep,
+		AsyncDuplicate:  asyncDup,
+		ReorderMinDelay: reordMin,
+		ReorderMaxDelay: reordMax,
 	}
 }
 
 func NewServer(cfg TestConfig) *Server {
+	f, err := os.OpenFile("trace_log.jsonl", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Fatalf("Failed to open execution log file: %v", err)
+	}
+
 	return &Server{
 		nodes:      make(map[string]*Node),
 		senders:    make(map[string]sender),
 		blocked:    make(map[string]map[string]bool),
 		rng:        rand.New(rand.NewSource(time.Now().UnixNano())),
 		testConfig: cfg,
+		logFile:    f,
+	}
+}
+
+func (s *Server) logMessage(env *pb.Envelope) {
+	s.logMu.Lock()
+	defer s.logMu.Unlock()
+	vcMap := make(map[string]uint64)
+	for _, entry := range env.Vector {
+		vcMap[entry.Node] = entry.Counter
+	}
+
+	entry := testing.LogEntry{
+		Timestamp:   time.Now().UnixNano(),
+		From:        env.From,
+		To:          env.To,
+		Type:        env.Type,
+		VectorClock: vcMap,
+		Payload:     env.Payload,
+	}
+
+	encoder := json.NewEncoder(s.logFile)
+	if err := encoder.Encode(entry); err != nil {
+		log.Printf("[ERR] Failed to write to log file: %v", err)
 	}
 }
 
@@ -73,7 +109,7 @@ func (n *Node) send(env *pb.Envelope) error {
 		log.Printf("[LOG] Message lost due to dead receiver node: %s -> %s", env.From, env.To)
 		return nil
 	}
-	
+
 	n.sendMu.Lock()
 	err := n.stream.Send(env)
 	n.sendMu.Unlock()
@@ -112,7 +148,8 @@ func (s *Server) Stream(stream pb.NetworkController_StreamServer) error {
 			return err
 		}
 
-		log.Printf("[LOG] %s -> %s Lamport [%d] %s: %s", msg.From, msg.To, msg.Lamport, msg.Type, msg.Payload)
+		log.Printf("[LOG] %s -> %s Type: %s", msg.From, msg.To, msg.Type)
+		s.logMessage(msg)
 
 		s.forward(msg)
 	}
