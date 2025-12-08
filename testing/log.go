@@ -1,11 +1,25 @@
 package testing
 
-// LogEntry defines the structure for the visualizer file
-type LogEntry struct {
-	Timestamp   int64             `json:"timestamp"` // Wall clock time
+import (
+	"encoding/json"
+)
+
+type EvtType string
+
+const (
+	EvtTypeSend EvtType = "SEND"
+	EvtTypeRecv EvtType = "RECV"
+	EvtTypeDrop EvtType = "DROP"
+)
+
+type TraceEvent struct {
+	ID          string            `json:"id"`
+	MessageID   string            `json:"message_id"`
+	Timestamp   int64             `json:"ts"`
+	EvtType     EvtType           `json:"evt_type"`
+	MsgType     string            `json:"msg_type"`
 	From        string            `json:"from"`
 	To          string            `json:"to"`
-	Type        string            `json:"type"`
-	VectorClock map[string]uint64 `json:"vector_clock"`
-	Payload     string            `json:"payload"`
+	VectorClock map[string]uint64 `json:"vc"`
+	Payload     json.RawMessage   `json:"payload,omitempty"`
 }

@@ -81,6 +81,7 @@ type Envelope struct {
 	Type          string                 `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`
 	Payload       string                 `protobuf:"bytes,4,opt,name=payload,proto3" json:"payload,omitempty"`
 	Vector        []*VectorClockEntry    `protobuf:"bytes,5,rep,name=vector,proto3" json:"vector,omitempty"`
+	Id            string                 `protobuf:"bytes,6,opt,name=id,proto3" json:"id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -150,6 +151,13 @@ func (x *Envelope) GetVector() []*VectorClockEntry {
 	return nil
 }
 
+func (x *Envelope) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
 var File_proto_dsnet_proto protoreflect.FileDescriptor
 
 const file_proto_dsnet_proto_rawDesc = "" +
@@ -157,13 +165,14 @@ const file_proto_dsnet_proto_rawDesc = "" +
 	"\x11proto/dsnet.proto\x12\x05dsnet\"@\n" +
 	"\x10VectorClockEntry\x12\x12\n" +
 	"\x04node\x18\x01 \x01(\tR\x04node\x12\x18\n" +
-	"\acounter\x18\x02 \x01(\x04R\acounter\"\x8d\x01\n" +
+	"\acounter\x18\x02 \x01(\x04R\acounter\"\x9d\x01\n" +
 	"\bEnvelope\x12\x12\n" +
 	"\x04from\x18\x01 \x01(\tR\x04from\x12\x0e\n" +
 	"\x02to\x18\x02 \x01(\tR\x02to\x12\x12\n" +
 	"\x04type\x18\x03 \x01(\tR\x04type\x12\x18\n" +
 	"\apayload\x18\x04 \x01(\tR\apayload\x12/\n" +
-	"\x06vector\x18\x05 \x03(\v2\x17.dsnet.VectorClockEntryR\x06vector2C\n" +
+	"\x06vector\x18\x05 \x03(\v2\x17.dsnet.VectorClockEntryR\x06vector\x12\x0e\n" +
+	"\x02id\x18\x06 \x01(\tR\x02id2C\n" +
 	"\x11NetworkController\x12.\n" +
 	"\x06Stream\x12\x0f.dsnet.Envelope\x1a\x0f.dsnet.Envelope(\x010\x01B#Z!github.com/distcodep7/dsnet/protob\x06proto3"
 

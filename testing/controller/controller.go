@@ -14,6 +14,7 @@ import (
 
 	pb "github.com/distcodep7/dsnet/proto"
 	"github.com/distcodep7/dsnet/testing"
+	"github.com/google/uuid"
 	"google.golang.org/grpc"
 )
 
@@ -49,7 +50,7 @@ type Server struct {
 
 	testConfig TestConfig
 
-	// NEW: File for structural logging
+	// File for structural logging
 	logFile *os.File
 	logMu   sync.Mutex
 }
@@ -81,21 +82,25 @@ func NewServer(cfg TestConfig) *Server {
 	}
 }
 
-func (s *Server) logMessage(env *pb.Envelope) {
+func (s *Server) logDrop(env *pb.Envelope) {
 	s.logMu.Lock()
 	defer s.logMu.Unlock()
+
 	vcMap := make(map[string]uint64)
 	for _, entry := range env.Vector {
 		vcMap[entry.Node] = entry.Counter
 	}
 
-	entry := testing.LogEntry{
+	entry := testing.TraceEvent{
+		ID:          uuid.NewString(),
+		MessageID:   env.Id,
 		Timestamp:   time.Now().UnixNano(),
+		EvtType:     testing.EvtTypeDrop,
+		MsgType:     env.Type,
 		From:        env.From,
 		To:          env.To,
-		Type:        env.Type,
 		VectorClock: vcMap,
-		Payload:     env.Payload,
+		Payload:     json.RawMessage(env.Payload),
 	}
 
 	encoder := json.NewEncoder(s.logFile)
@@ -148,9 +153,9 @@ func (s *Server) Stream(stream pb.NetworkController_StreamServer) error {
 			return err
 		}
 
-		log.Printf("[LOG] %s -> %s Type: %s", msg.From, msg.To, msg.Type)
-		s.logMessage(msg)
-
+		if msg.To == "CTRL" {
+			continue
+		}
 		s.forward(msg)
 	}
 }
@@ -167,11 +172,12 @@ func (n *Node) SendEnvelope(env *pb.Envelope) error {
 func (s *Server) forward(msg *pb.Envelope) {
 	s.mu.Lock()
 
-	//Partition
+	// Partition Check
 	if blockedTargets, exists := s.blocked[msg.From]; exists {
 		if blockedTargets[msg.To] {
 			log.Printf("[PARTITION] Dropped: %s -> %s", msg.From, msg.To)
 			s.mu.Unlock()
+			s.logDrop(msg)
 			return
 		}
 	}
@@ -189,7 +195,6 @@ func (s *Server) forward(msg *pb.Envelope) {
 		log.Printf("[EVNT ERR] %v", err)
 	}
 	if skippedMessage {
-		// message delivery intentionally skipped (dropped or scheduled)
 		return
 	}
 

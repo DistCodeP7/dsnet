@@ -17,7 +17,7 @@ func isControlMsg(msg *pb.Envelope) bool {
 	return msg.From == "CTRL" || msg.To == "CTRL"
 }
 
-//probCheck returns true with probability p.
+// probCheck returns true with probability p.
 func (s *Server) probCheck(p float64) bool {
 	s.rngMu.Lock()
 	r := s.rng.Float64()
@@ -25,7 +25,7 @@ func (s *Server) probCheck(p float64) bool {
 	return r < p
 }
 
-//randIntn returns a non-negative pseudo-random int in [0,n).
+// randIntn returns a non-negative pseudo-random int in [0,n).
 func (s *Server) randIntn(n int) int {
 	if n <= 0 {
 		return 0
@@ -40,6 +40,7 @@ func (s *Server) DropMessage(msg *pb.Envelope) error {
 	if msg == nil {
 		return fmt.Errorf("[DROP ERR] Message is nil")
 	}
+	s.logDrop(msg)
 	log.Printf("[DROP] Dropped: %s -> %s", msg.From, msg.To)
 	return nil
 }
@@ -82,7 +83,7 @@ func (s *Server) DuplicateMessage(msg *pb.Envelope) error {
 // delaySendWithDuration schedules a delayed delivery. Returns true if scheduled, false if destination is unknown.
 func (s *Server) delaySendWithDuration(msg *pb.Envelope, d time.Duration) bool {
 	s.mu.Lock()
-	
+
 	target, ok := s.senders[msg.To]
 	s.mu.Unlock()
 	if !ok {
@@ -137,7 +138,7 @@ func (s *Server) handleMessageEvents(msg *pb.Envelope) (bool, error) {
 	if isTesterMsg(msg) || isControlMsg(msg) {
 		return false, nil
 	}
-	
+
 	if s.probCheck(s.testConfig.DropProb) {
 		if err := s.DropMessage(msg); err != nil {
 			return false, fmt.Errorf("[DROP ERR] %v", err)

@@ -19,4 +19,5 @@ message Envelope {
   string type = 3;
   string payload = 4;
   repeated VectorClockEntry vector = 5;
+  string id = 6;
 }
