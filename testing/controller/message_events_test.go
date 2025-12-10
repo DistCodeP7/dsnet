@@ -105,7 +105,7 @@ func TestDropMessage(t *testing.T) {
 	}
 
 	t.Run("nil_message_returns_error", func(t *testing.T) {
-		err := s.DropMessage(nil)
+		err := s.dropMessage(nil)
 		if err == nil {
 			t.Fatal("expected error when dropping nil message, got nil")
 		}
@@ -119,7 +119,7 @@ func TestDropMessage(t *testing.T) {
 			Payload: `{"hello":"world"}`,
 		}
 
-		err := s.DropMessage(msg)
+		err := s.dropMessage(msg)
 		if err != nil {
 			t.Fatalf("unexpected error when dropping valid message: %v", err)
 		}
@@ -157,7 +157,7 @@ func TestDuplicateMessage(t *testing.T) {
 				testConfig: TestConfig{AsyncDuplicate: tc.async},
 			}
 
-			err := s.DuplicateMessage(msg)
+			err := s.duplicateMessage(msg)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -207,7 +207,7 @@ func TestReorderMessage(t *testing.T) {
 	}
 
 	start := time.Now()
-	s.ReorderMessage(msg)
+	s.reorderMessage(msg)
 
 	select {
 	case sent := <-sendCh:
@@ -263,7 +263,7 @@ func TestReorderMessage_DelayedInterleave(t *testing.T) {
 			start := time.Now()
 
 			// schedule delayed message
-			skipped, err := s.ReorderMessage(tc.delayedMsg)
+			skipped, err := s.reorderMessage(tc.delayedMsg)
 			if err != nil {
 				t.Fatalf("ReorderMessage returned error: %v", err)
 			}

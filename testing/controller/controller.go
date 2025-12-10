@@ -1,3 +1,7 @@
+// Package controller implements the DSNet network controller with testing capabilities.
+// It manages node registrations, message forwarding, and network partitions.
+// It also provides functions to manipulate message delivery according to testing configurations.
+// These include dropping, duplicating, and reordering messages.
 package controller
 
 import (
@@ -22,6 +26,7 @@ type sender interface {
 	SendEnvelope(*pb.Envelope) error
 }
 
+// Node represents a DSNet node that can send messages via the controller.
 type Node struct {
 	id     string
 	stream pb.NetworkController_StreamServer
@@ -29,6 +34,9 @@ type Node struct {
 	alive  atomic.Bool
 }
 
+// TestConfig holds the configuration parameters for simulating network messaging conditions.
+// These include probabilities for message drops, duplications, and reordering,
+// as well as parameters for reordering delays.
 type TestConfig struct {
 	DropProb        float64
 	DupeProb        float64
@@ -38,6 +46,7 @@ type TestConfig struct {
 	ReorderMaxDelay int
 }
 
+// Server implements the DSNet network controller with testing capabilities.
 type Server struct {
 	pb.UnimplementedNetworkControllerServer
 
@@ -55,6 +64,7 @@ type Server struct {
 	logMu   sync.Mutex
 }
 
+// NewTestConfig creates a new TestConfig with the specified parameters.
 func NewTestConfig(dropp, reordp, dupep float64, asyncDup bool, reordMin, reordMax int) TestConfig {
 	return TestConfig{
 		DropProb:        dropp,
@@ -66,6 +76,7 @@ func NewTestConfig(dropp, reordp, dupep float64, asyncDup bool, reordMin, reordM
 	}
 }
 
+// newServer creates a new DSNet controller server with the specified test configuration.
 func NewServer(cfg TestConfig) *Server {
 	f, err := os.OpenFile("trace_log.jsonl", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
@@ -82,6 +93,7 @@ func NewServer(cfg TestConfig) *Server {
 	}
 }
 
+// logDrop logs the dropped message to the structural log file.
 func (s *Server) logDrop(env *pb.Envelope) {
 	s.logMu.Lock()
 	defer s.logMu.Unlock()
@@ -109,6 +121,7 @@ func (s *Server) logDrop(env *pb.Envelope) {
 	}
 }
 
+// send sends the given envelope to the node if it is alive.
 func (n *Node) send(env *pb.Envelope) error {
 	if !n.alive.Load() {
 		log.Printf("[LOG] Message lost due to dead receiver node: %s -> %s", env.From, env.To)
@@ -122,6 +135,7 @@ func (n *Node) send(env *pb.Envelope) error {
 	return err
 }
 
+// Stream handles the bi-directional streaming RPC between the controller and a node.
 func (s *Server) Stream(stream pb.NetworkController_StreamServer) error {
 	firstMsg, err := stream.Recv()
 	if err != nil {
@@ -160,6 +174,7 @@ func (s *Server) Stream(stream pb.NetworkController_StreamServer) error {
 	}
 }
 
+// SendEnvelope sends the given envelope via the node's gRPC stream.
 func (n *Node) SendEnvelope(env *pb.Envelope) error {
 	if n.stream == nil {
 		return fmt.Errorf("Node stream not initialized")
@@ -169,6 +184,8 @@ func (n *Node) SendEnvelope(env *pb.Envelope) error {
 	return n.stream.Send(env)
 }
 
+// forward processes and forwards the given message to its destination node,
+// applying any configured message events such as drop, duplicate, or reorder.
 func (s *Server) forward(msg *pb.Envelope) {
 	s.mu.Lock()
 
@@ -203,6 +220,7 @@ func (s *Server) forward(msg *pb.Envelope) {
 	}
 }
 
+// removeNode removes the node with the given ID from the server's registry.
 func (s *Server) removeNode(id string) {
 	s.mu.Lock()
 	n, exists := s.nodes[id]
@@ -216,6 +234,7 @@ func (s *Server) removeNode(id string) {
 	log.Printf("[CTRL] Node Disconnected: %s", id)
 }
 
+// BlockCommunication blocks messages from node a to node b.
 func (s *Server) BlockCommunication(a, b string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -227,6 +246,7 @@ func (s *Server) BlockCommunication(a, b string) {
 	log.Printf("[PARTITION] Blocked: %s -> %s", a, b)
 }
 
+// UnblockCommunication unblocks messages from node a to node b.
 func (s *Server) UnblockCommunication(a, b string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -237,6 +257,8 @@ func (s *Server) UnblockCommunication(a, b string) {
 	}
 }
 
+// CreatePartition creates a partition between two groups of nodes.
+// Nodes in group1 cannot communicate with nodes in group2 and vice versa.
 func (s *Server) CreatePartition(group1, group2 []string) {
 	for _, a := range group1 {
 		for _, b := range group2 {
@@ -246,6 +268,8 @@ func (s *Server) CreatePartition(group1, group2 []string) {
 	}
 }
 
+// Serve starts the gRPC server for the DSNet controller with the given test configuration.
+// Server listens on port 50051.
 func Serve(cfg TestConfig) {
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {

@@ -8,6 +8,7 @@ const (
 	TypePanic   ResultType = "panic"
 )
 
+// TestResult represents the result of a single test execution.
 type TestResult struct {
 	Type       ResultType `json:"type"`
 	Name       string     `json:"name"`

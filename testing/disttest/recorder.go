@@ -1,3 +1,5 @@
+// Package disttest provides utilities for recording and reporting distributed test results.
+// It includes functions to wrap test cases, record failures, and write results to a JSON file.
 package disttest
 
 import (
@@ -17,6 +19,8 @@ var (
 )
 
 // Wrap should be used around each test body:
+// It records the test result and duration.
+// It also recovers from panics and records them as test failures.
 func Wrap(t *testing.T, fn func(t *testing.T)) {
 	name := t.Name()
 	start := time.Now()
@@ -66,6 +70,7 @@ func Wrap(t *testing.T, fn func(t *testing.T)) {
 }
 
 // Fail records a failure reason for the current test and fails the test.
+// It should be used instead of t.Fatal or t.Errorf to ensure the failure reason is recorded.
 func Fail(t *testing.T, format string, args ...interface{}) {
 	t.Helper()
 
@@ -78,6 +83,7 @@ func Fail(t *testing.T, format string, args ...interface{}) {
 	t.Errorf("%s", msg)
 }
 
+// Write writes the recorded test results to the specified file in JSON format.
 func Write(file string) error {
 	mu.Lock()
 	defer mu.Unlock()

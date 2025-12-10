@@ -36,7 +36,8 @@ func (s *Server) randIntn(n int) int {
 	return v
 }
 
-func (s *Server) DropMessage(msg *pb.Envelope) error {
+// dropMessage logs and drops the given message.
+func (s *Server) dropMessage(msg *pb.Envelope) error {
 	if msg == nil {
 		return fmt.Errorf("[DROP ERR] Message is nil")
 	}
@@ -45,7 +46,9 @@ func (s *Server) DropMessage(msg *pb.Envelope) error {
 	return nil
 }
 
-func (s *Server) DuplicateMessage(msg *pb.Envelope) error {
+// duplicateMessage creates and sends a deep clone of the given message.
+// The duplicate is sent asynchronously unless AsyncDuplicate is false.
+func (s *Server) duplicateMessage(msg *pb.Envelope) error {
 	doAsync := true
 	if !s.testConfig.AsyncDuplicate {
 		doAsync = false
@@ -80,7 +83,7 @@ func (s *Server) DuplicateMessage(msg *pb.Envelope) error {
 }
 
 // delaySendWithDuration sends a scheduled message after a set amount of time.
-// delaySendWithDuration schedules a delayed delivery. Returns true if scheduled, false if destination is unknown.
+// delaySendWithDuration schedules a delayed delivery. Returns true if scheduled, false otherwise.
 func (s *Server) delaySendWithDuration(msg *pb.Envelope, d time.Duration) bool {
 	s.mu.Lock()
 
@@ -106,9 +109,10 @@ func (s *Server) delaySendWithDuration(msg *pb.Envelope, d time.Duration) bool {
 	return true
 }
 
-// ReorderMessage chooses a random delay between ReorderMinDelay and ReorderMaxDelay
+// reorderMessage chooses a random delay between ReorderMinDelay and ReorderMaxDelay
 // (seconds) and schedules the delayed send.
-func (s *Server) ReorderMessage(msg *pb.Envelope) (bool, error) {
+// It returns true if the message delivery is scheduled for later, false otherwise.
+func (s *Server) reorderMessage(msg *pb.Envelope) (bool, error) {
 	min := s.testConfig.ReorderMinDelay
 	max := s.testConfig.ReorderMaxDelay
 
@@ -132,6 +136,8 @@ func (s *Server) ReorderMessage(msg *pb.Envelope) (bool, error) {
 
 // handleMessageEvents processes message events (drop, duplicate, reorder).
 // It returns (true, nil) if the message delivery should be skipped (dropped or scheduled for later).
+// It returns (false, nil) if the message should be sent immediately.
+// It returns (false, err) if an error occurred during processing.
 func (s *Server) handleMessageEvents(msg *pb.Envelope) (bool, error) {
 	// Do not manipulate messages involving TESTER or the controller itself ("CTRL").
 	// Reordering controller-bound traffic can cause unknown-destination during startup/reset.
@@ -140,21 +146,21 @@ func (s *Server) handleMessageEvents(msg *pb.Envelope) (bool, error) {
 	}
 
 	if s.probCheck(s.testConfig.DropProb) {
-		if err := s.DropMessage(msg); err != nil {
+		if err := s.dropMessage(msg); err != nil {
 			return false, fmt.Errorf("[DROP ERR] %v", err)
 		}
 		return true, nil
 	}
 
 	if s.probCheck(s.testConfig.DupeProb) {
-		if err := s.DuplicateMessage(msg); err != nil {
+		if err := s.duplicateMessage(msg); err != nil {
 			return false, fmt.Errorf("[DUPE ERR] %v", err)
 		}
 		return false, nil
 	}
 
 	if s.probCheck(s.testConfig.ReorderProb) {
-		scheduled, err := s.ReorderMessage(msg)
+		scheduled, err := s.reorderMessage(msg)
 		if err != nil {
 			return false, fmt.Errorf("[REORD ERR] %v", err)
 		}

@@ -1,3 +1,5 @@
+// Package dsnet implements a distributed systems networking library.
+// It provides a Node type for sending and receiving messages.
 package dsnet
 
 import (
@@ -21,12 +23,14 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+// BaseMessage represents the basic structure of a DSNet message.
 type BaseMessage struct {
 	From string `json:"from"`
 	To   string `json:"to"`
 	Type string `json:"type"`
 }
 
+// Event represents a message sent or received by a DSNet node.
 type Event struct {
 	From        string
 	To          string
@@ -35,6 +39,7 @@ type Event struct {
 	VectorClock map[string]uint64
 }
 
+// Node represents a DSNet node that can send and receive messages.
 type Node struct {
 	ID string
 
@@ -51,6 +56,8 @@ type Node struct {
 	logMu   sync.Mutex
 }
 
+// NewNode creates a new DSNet node and connects it to the controller at the specified address.
+// It performs a handshake with the controller upon creation.
 func NewNode(id string, controllerAddr string) (*Node, error) {
 	conn, err := grpc.NewClient(controllerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -98,6 +105,7 @@ func NewNode(id string, controllerAddr string) (*Node, error) {
 	return n, nil
 }
 
+// Close gracefully shuts down the node, closing connections and files.
 func (n *Node) Close() {
 	n.stream.CloseSend()
 	n.conn.Close()
@@ -106,6 +114,8 @@ func (n *Node) Close() {
 	n.logFile.Close()
 }
 
+// Send sends a message to the specified destination node.
+// The message is marshaled to JSON and wrapped in an envelope with vector clock information.
 func (n *Node) Send(ctx context.Context, dest string, msg interface{}) error {
 	payloadBytes, err := json.Marshal(msg)
 	if err != nil {
@@ -146,6 +156,8 @@ func (n *Node) Send(ctx context.Context, dest string, msg interface{}) error {
 	return nil
 }
 
+// runRecvLoop continuously receives messages from the gRPC stream
+// and processes them, updating the vector clock and logging events.
 func (n *Node) runRecvLoop() {
 	defer n.wg.Done()
 
@@ -193,6 +205,7 @@ func (n *Node) runRecvLoop() {
 	}
 }
 
+// logEvent logs a message event to the node's log file.
 func (n *Node) logEvent(evtType testing.EvtType, msgID, msgType, from, to string, vc map[string]uint64, payload []byte) {
 	entry := testing.TraceEvent{
 		ID:          uuid.NewString(),
@@ -213,6 +226,8 @@ func (n *Node) logEvent(evtType testing.EvtType, msgID, msgType, from, to string
 	_ = encoder.Encode(entry)
 }
 
+// listenForSignal sets up a listener for OS termination signals
+// to gracefully close the node.
 func (n *Node) listenForSignal() {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGINT)
