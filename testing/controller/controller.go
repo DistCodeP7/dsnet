@@ -33,9 +33,15 @@ type TestConfig struct {
 	DropProb        float64
 	DupeProb        float64
 	AsyncDuplicate  bool
-	ReorderProb     float64
+	ReorderMessages bool
 	ReorderMinDelay int
 	ReorderMaxDelay int
+
+	//Network Spikes
+	NetworkSpikeEnabled bool
+	NetSpikeSmallProb   float64
+	NetSpikeMedProb     float64
+	NetSpikeLargeProb   float64
 }
 
 type Server struct {
@@ -55,14 +61,20 @@ type Server struct {
 	logMu   sync.Mutex
 }
 
-func NewTestConfig(dropp, reordp, dupep float64, asyncDup bool, reordMin, reordMax int) TestConfig {
+// NewTestConfig creates a new TestConfig with the specified parameters.
+func NewTestConfig(dropp float64, dupep float64, reordMessages bool, asyncDup bool, reordMin int, reordMax int) TestConfig {
 	return TestConfig{
 		DropProb:        dropp,
-		ReorderProb:     reordp,
 		DupeProb:        dupep,
+		ReorderMessages: reordMessages,
 		AsyncDuplicate:  asyncDup,
 		ReorderMinDelay: reordMin,
 		ReorderMaxDelay: reordMax,
+
+		NetworkSpikeEnabled: true,
+		NetSpikeSmallProb:   0.02,
+		NetSpikeMedProb:     0.005,
+		NetSpikeLargeProb:   0.001,
 	}
 }
 

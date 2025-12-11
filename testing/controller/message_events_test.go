@@ -12,7 +12,6 @@ import (
 // fakeSender implements sender and captures sent messages
 type fakeSender struct {
 	sendCh chan *pb.Envelope
-	
 }
 
 func (f *fakeSender) SendEnvelope(msg *pb.Envelope) error {
@@ -101,11 +100,11 @@ func TestDropMessage(t *testing.T) {
 	s := &Server{
 		nodes:      make(map[string]*Node),
 		blocked:    make(map[string]map[string]bool),
-		testConfig: TestConfig{}, 
+		testConfig: TestConfig{},
 	}
 
 	t.Run("nil_message_returns_error", func(t *testing.T) {
-		err := s.DropMessage(nil)
+		err := s.dropMessage(nil)
 		if err == nil {
 			t.Fatal("expected error when dropping nil message, got nil")
 		}
@@ -119,7 +118,7 @@ func TestDropMessage(t *testing.T) {
 			Payload: `{"hello":"world"}`,
 		}
 
-		err := s.DropMessage(msg)
+		err := s.dropMessage(msg)
 		if err != nil {
 			t.Fatalf("unexpected error when dropping valid message: %v", err)
 		}
@@ -157,7 +156,7 @@ func TestDuplicateMessage(t *testing.T) {
 				testConfig: TestConfig{AsyncDuplicate: tc.async},
 			}
 
-			err := s.DuplicateMessage(msg)
+			err := s.duplicateMessage(msg)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -201,25 +200,27 @@ func TestReorderMessage(t *testing.T) {
 	s := &Server{
 		senders: map[string]sender{"B": fs},
 		testConfig: TestConfig{
-			ReorderMinDelay: 1, 
-			ReorderMaxDelay: 1, 
+			ReorderMessages:     true,
+			ReorderMinDelay:     100,
+			ReorderMaxDelay:     100,
+			NetworkSpikeEnabled: false,
 		},
 	}
 
 	start := time.Now()
-	s.ReorderMessage(msg)
+	s.reorderMessage(msg)
 
 	select {
 	case sent := <-sendCh:
 		if !proto.Equal(sent, msg) {
 			t.Fatalf("sent message differs from original: %+v", sent)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(1 * time.Second):
 		t.Fatal("expected message to be sent after delay, but nothing was received")
 	}
 
 	elapsed := time.Since(start)
-	if elapsed < 1*time.Second {
+	if elapsed < 100*time.Millisecond {
 		t.Errorf("message sent too early: elapsed=%v", elapsed)
 	}
 }
@@ -227,20 +228,20 @@ func TestReorderMessage(t *testing.T) {
 // TestReorderMessage_DelayedInterleave tests that a message can be received during another message's delay period.
 func TestReorderMessage_DelayedInterleave(t *testing.T) {
 	tests := []struct {
-		name             string
-		reorderSeconds   int           // must be int because TestConfig uses int
-		reorderDuration  time.Duration // actual delay used for measuring
-		interleaveMsg    *pb.Envelope
-		delayedMsg       *pb.Envelope
-		expectOrder      []string
+		name                string
+		reorderMilliseconds int           // must be int because TestConfig uses int
+		reorderDuration     time.Duration // actual delay used for measuring
+		interleaveMsg       *pb.Envelope
+		delayedMsg          *pb.Envelope
+		expectOrder         []string
 	}{
 		{
-			name:            "delayed_then_interleave",
-			reorderSeconds:  1,
-			reorderDuration: 1 * time.Second,
-			delayedMsg:      &pb.Envelope{From: "A", To: "B", Type: "DELAYED", Payload: "{}"},
-			interleaveMsg:   &pb.Envelope{From: "A", To: "B", Type: "IMMEDIATE", Payload: "{}"},
-			expectOrder:     []string{"IMMEDIATE", "DELAYED"},
+			name:                "delayed_then_interleave",
+			reorderMilliseconds: 100,
+			reorderDuration:     100 * time.Millisecond,
+			delayedMsg:          &pb.Envelope{From: "A", To: "B", Type: "DELAYED", Payload: "{}"},
+			interleaveMsg:       &pb.Envelope{From: "A", To: "B", Type: "IMMEDIATE", Payload: "{}"},
+			expectOrder:         []string{"IMMEDIATE", "DELAYED"},
 		},
 	}
 
@@ -253,9 +254,9 @@ func TestReorderMessage_DelayedInterleave(t *testing.T) {
 			s := &Server{
 				senders: map[string]sender{"B": fs},
 				testConfig: TestConfig{
-					ReorderProb:     1.0,            // always reorder
-					ReorderMinDelay: tc.reorderSeconds,
-					ReorderMaxDelay: tc.reorderSeconds,
+					ReorderMessages: true,
+					ReorderMinDelay: tc.reorderMilliseconds,
+					ReorderMaxDelay: tc.reorderMilliseconds,
 				},
 				rng: newTestRNG(),
 			}
@@ -263,7 +264,7 @@ func TestReorderMessage_DelayedInterleave(t *testing.T) {
 			start := time.Now()
 
 			// schedule delayed message
-			skipped, err := s.ReorderMessage(tc.delayedMsg)
+			skipped, err := s.reorderMessage(tc.delayedMsg)
 			if err != nil {
 				t.Fatalf("ReorderMessage returned error: %v", err)
 			}
@@ -305,17 +306,17 @@ func TestHandleMessageEvents(t *testing.T) {
 	msg := &pb.Envelope{From: "A", To: "B", Type: "TEST", Payload: "{}"}
 
 	tests := []struct {
-		name           string
-		dropProb       float64
-		dupeProb       float64
-		reorderProb    float64
-		expectSkip     bool // handleMessageEvents returns true if delivery skipped
+		name            string
+		dropProb        float64
+		dupeProb        float64
+		reorderMessages bool
+		expectSkip      bool // handleMessageEvents returns true if delivery skipped
 		expectDuplicate bool // message cloned and sent
 	}{
-		{"drop only", 1, 0, 0, true, false},
-		{"duplicate only", 0, 1, 0, false, true},
-		{"reorder only", 0, 0, 1, true, false},
-		{"none", 0, 0, 0, false, false},
+		{"drop only", 1, 0, false, true, false},
+		{"duplicate only", 0, 1, false, false, true},
+		{"reorder only", 0, 0, true, true, false},
+		{"none", 0, 0, false, false, false},
 	}
 
 	for _, tc := range tests {
@@ -335,9 +336,9 @@ func TestHandleMessageEvents(t *testing.T) {
 					"B": &fakeSender{sendCh: sendCh},
 				},
 				testConfig: TestConfig{
-					DropProb:    tc.dropProb,
-					DupeProb:    tc.dupeProb,
-					ReorderProb: tc.reorderProb,
+					DropProb:        tc.dropProb,
+					DupeProb:        tc.dupeProb,
+					ReorderMessages: tc.reorderMessages,
 				},
 				rng: newTestRNG(), // deterministic
 			}
