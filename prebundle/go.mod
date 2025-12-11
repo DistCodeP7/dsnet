@@ -3,7 +3,7 @@ module runner
 go 1.25.4
 
 require (
-	github.com/distcodep7/dsnet v0.0.7-0.20251202235233-7a1c718bd3d9
+	github.com/distcodep7/dsnet v0.0.8
 	github.com/google/uuid v1.6.0
 )
 

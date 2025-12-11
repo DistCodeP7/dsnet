@@ -76,7 +76,7 @@ func (s *Server) handleMessageEvents(msg *pb.Envelope) (bool, error) {
 // dropMessage logs and drops the given message.
 func (s *Server) dropMessage(msg *pb.Envelope) error {
 	if msg == nil {
-		return fmt.Errorf("[DROP ERR] Message is nil")
+		return fmt.Errorf("message not found")
 	}
 	s.logDrop(msg)
 	log.Printf("[DROP] %s Dropped: %s -> %s", msg.Type, msg.From, msg.To)
@@ -125,7 +125,7 @@ func (s *Server) reorderMessage(msg *pb.Envelope) (bool, error) {
 	max := s.testConfig.ReorderMaxDelay
 
 	if min > max {
-		return false, fmt.Errorf("ReorderMinDelay (%d) cannot be greater than ReorderMaxDelay (%d)", min, max)
+		return false, fmt.Errorf("reorderMinDelay (%d) cannot be greater than ReorderMaxDelay (%d)", min, max)
 	}
 
 	spike := 0
