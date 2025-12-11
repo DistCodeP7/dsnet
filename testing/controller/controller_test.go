@@ -63,8 +63,8 @@ func TestCreatePartition(t *testing.T) {
 // This ensures Send is not invoked for blocked pairs.
 func TestForward_DropsWhenBlocked(t *testing.T) {
 	s := &Server{
-		nodes:   make(map[string]*Node),
-		blocked: make(map[string]map[string]bool),
+		nodes:      make(map[string]*Node),
+		blocked:    make(map[string]map[string]bool),
 		testConfig: TestConfig{},
 	}
 
@@ -88,8 +88,8 @@ func TestForward_DropsWhenBlocked(t *testing.T) {
 // Test forward with unknown destination should not panic even when not blocked.
 func TestForward_UnknownDestination(t *testing.T) {
 	s := &Server{
-		nodes:   make(map[string]*Node),
-		blocked: make(map[string]map[string]bool),
+		nodes:      make(map[string]*Node),
+		blocked:    make(map[string]map[string]bool),
 		testConfig: TestConfig{},
 	}
 

@@ -200,10 +200,10 @@ func TestReorderMessage(t *testing.T) {
 	s := &Server{
 		senders: map[string]sender{"B": fs},
 		testConfig: TestConfig{
-			ReorderMessages:     true,
-			ReorderMinDelay:     100,
-			ReorderMaxDelay:     100,
-			NetworkSpikeEnabled: false,
+			DisableMessageDelays: true,
+			MsgMinDelay:          100,
+			MsgMaxDelay:          100,
+			EnableNetworkSpikes:  false,
 		},
 	}
 
@@ -254,9 +254,9 @@ func TestReorderMessage_DelayedInterleave(t *testing.T) {
 			s := &Server{
 				senders: map[string]sender{"B": fs},
 				testConfig: TestConfig{
-					ReorderMessages: true,
-					ReorderMinDelay: tc.reorderMilliseconds,
-					ReorderMaxDelay: tc.reorderMilliseconds,
+					DisableMessageDelays: true,
+					MsgMinDelay:          tc.reorderMilliseconds,
+					MsgMaxDelay:          tc.reorderMilliseconds,
 				},
 				rng: newTestRNG(),
 			}
@@ -306,17 +306,17 @@ func TestHandleMessageEvents(t *testing.T) {
 	msg := &pb.Envelope{From: "A", To: "B", Type: "TEST", Payload: "{}"}
 
 	tests := []struct {
-		name            string
-		dropProb        float64
-		dupeProb        float64
-		reorderMessages bool
-		expectSkip      bool // handleMessageEvents returns true if delivery skipped
-		expectDuplicate bool // message cloned and sent
+		name                 string
+		dropProb             float64
+		dupeProb             float64
+		disableMessageDelays bool
+		expectSkip           bool // handleMessageEvents returns true if delivery skipped
+		expectDuplicate      bool // message cloned and sent
 	}{
-		{"drop only", 1, 0, false, true, false},
-		{"duplicate only", 0, 1, false, false, true},
-		{"reorder only", 0, 0, true, true, false},
-		{"none", 0, 0, false, false, false},
+		{"drop only", 1, 0, true, true, false},
+		{"duplicate only", 0, 1, true, false, true},
+		{"reorder only", 0, 0, false, true, false},
+		{"none", 0, 0, true, false, false},
 	}
 
 	for _, tc := range tests {
@@ -336,9 +336,9 @@ func TestHandleMessageEvents(t *testing.T) {
 					"B": &fakeSender{sendCh: sendCh},
 				},
 				testConfig: TestConfig{
-					DropProb:        tc.dropProb,
-					DupeProb:        tc.dupeProb,
-					ReorderMessages: tc.reorderMessages,
+					MsgDropProb:          tc.dropProb,
+					MsgDupeProb:          tc.dupeProb,
+					DisableMessageDelays: tc.disableMessageDelays,
 				},
 				rng: newTestRNG(), // deterministic
 			}
