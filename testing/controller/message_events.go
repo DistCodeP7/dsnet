@@ -36,18 +36,55 @@ func (s *Server) randIntn(n int) int {
 	return v
 }
 
+// handleMessageEvents processes message events (drop, duplicate, reorder).
+// It returns (true, nil) if the message delivery should be skipped (dropped or scheduled for later).
+// It returns (false, nil) if the message should be sent immediately.
+// It returns (false, err) if an error occurred during processing.
+func (s *Server) handleMessageEvents(msg *pb.Envelope) (bool, error) {
+	if isTesterMsg(msg) || isControlMsg(msg) {
+		return false, nil
+	}
+
+	if s.probCheck(s.testConfig.DropProb) {
+		if err := s.dropMessage(msg); err != nil {
+			return false, fmt.Errorf("[DROP ERR] %v", err)
+		}
+		return true, nil
+	}
+
+	if s.probCheck(s.testConfig.DupeProb) {
+		if err := s.duplicateMessage(msg); err != nil {
+			return false, fmt.Errorf("[DUPE ERR] %v", err)
+		}
+		return false, nil
+	}
+
+	if s.testConfig.ReorderMessages {
+		scheduled, err := s.reorderMessage(msg)
+		if err != nil {
+			return false, fmt.Errorf("[REORD ERR] %v", err)
+		}
+		if scheduled {
+			// message delivery delayed; do not send now
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 // dropMessage logs and drops the given message.
 func (s *Server) dropMessage(msg *pb.Envelope) error {
 	if msg == nil {
-		return fmt.Errorf("[DROP ERR] Message is nil")
+		return fmt.Errorf("message not found")
 	}
 	s.logDrop(msg)
-	log.Printf("[DROP] Dropped: %s -> %s", msg.From, msg.To)
+	log.Printf("[DROP] %s Dropped: %s -> %s", msg.Type, msg.From, msg.To)
 	return nil
 }
 
-// duplicateMessage creates and sends a deep clone of the given message.
-// The duplicate is sent asynchronously unless AsyncDuplicate is false.
+// duplicateMessage clones and sends a duplicate of the given message.
+// It sends the duplicate asynchronously unless AsyncDuplicate is false.
 func (s *Server) duplicateMessage(msg *pb.Envelope) error {
 	doAsync := true
 	if !s.testConfig.AsyncDuplicate {
@@ -68,7 +105,7 @@ func (s *Server) duplicateMessage(msg *pb.Envelope) error {
 			if err := n.SendEnvelope(m); err != nil {
 				log.Printf("[DUPE ERR] %v", err)
 			} else {
-				log.Printf("[DUPE] Duplicated: %s -> %s", m.From, m.To)
+				log.Printf("[DUPE] %s Duplicated: %s -> %s", m.Type, m.From, m.To)
 			}
 		}(target, clone)
 		return nil
@@ -78,15 +115,61 @@ func (s *Server) duplicateMessage(msg *pb.Envelope) error {
 	if err := target.SendEnvelope(clone); err != nil {
 		return err
 	}
-	log.Printf("[DUPE] Duplicated: %s -> %s", clone.From, clone.To)
+	log.Printf("[DUPE] %s Duplicated: %s -> %s", clone.Type, clone.From, clone.To)
 	return nil
+}
+
+// reorderMessage chooses a random delay between ReorderMinDelay and ReorderMaxDelay
+// (milliseconds) and schedules the delayed send.
+// It returns true if the message delivery is scheduled for later, false otherwise.
+func (s *Server) reorderMessage(msg *pb.Envelope) (bool, error) {
+	min := s.testConfig.ReorderMinDelay
+	max := s.testConfig.ReorderMaxDelay
+
+	if min > max {
+		return false, fmt.Errorf("reorderMinDelay (%d) cannot be greater than ReorderMaxDelay (%d)", min, max)
+	}
+
+	spike := 0
+	if s.testConfig.NetworkSpikeEnabled {
+		spike = s.latencySpike()
+	}
+
+	var duration int
+	if spike > 0 {
+		duration = spike
+	} else if max == min {
+		duration = min
+	} else {
+		duration = s.randIntn(max-min+1) + min
+	}
+
+	d := time.Duration(duration) * time.Millisecond
+	if scheduled := s.delaySendWithDuration(msg, d); scheduled {
+		return true, nil // skip immediate send; delayed goroutine will deliver
+	}
+	// Destination unknown right now; fall back to immediate send by returning false
+	return false, nil
+}
+
+// latencySpike determines if a latency spike should occur based on configured probabilities.
+// It returns the spike duration in milliseconds (0 if no spike).
+func (s *Server) latencySpike() int {
+	d := 0
+	if s.probCheck(s.testConfig.NetSpikeLargeProb) {
+		d = 100 + s.randIntn(401)
+	} else if s.probCheck(s.testConfig.NetSpikeMedProb) {
+		d = 20 + s.randIntn(81)
+	} else if s.probCheck(s.testConfig.NetSpikeSmallProb) {
+		d = 5 + s.randIntn(16)
+	}
+	return d
 }
 
 // delaySendWithDuration sends a scheduled message after a set amount of time.
 // delaySendWithDuration schedules a delayed delivery. Returns true if scheduled, false otherwise.
 func (s *Server) delaySendWithDuration(msg *pb.Envelope, d time.Duration) bool {
 	s.mu.Lock()
-
 	target, ok := s.senders[msg.To]
 	s.mu.Unlock()
 	if !ok {
@@ -97,78 +180,26 @@ func (s *Server) delaySendWithDuration(msg *pb.Envelope, d time.Duration) bool {
 	clone := proto.Clone(msg).(*pb.Envelope)
 
 	go func(n sender, m *pb.Envelope, d time.Duration) {
-		log.Printf("[REORD] Delaying: %s -> %s for %v", m.From, m.To, d)
+		min := time.Duration(s.testConfig.ReorderMinDelay) * time.Millisecond
+		max := time.Duration(s.testConfig.ReorderMaxDelay) * time.Millisecond
+
+		if d == 0 {
+			return
+		}
+
+		isSpike := d < min || d > max
+		if isSpike {
+			log.Printf("[REORD] Network spike delaying %s: %s -> %s for %v", m.Type, m.From, m.To, d)
+		}
+
 		time.Sleep(d)
+
 		if err := n.SendEnvelope(m); err != nil {
 			log.Printf("[REORD ERR] failed send after delay: %v", err)
-		} else {
-			log.Printf("[REORD] Sent delayed: %s -> %s", m.From, m.To)
+		} else if isSpike {
+			log.Printf("[REORD] Sent %s delayed: %s -> %s", m.Type, m.From, m.To)
 		}
 	}(target, clone, d)
 
 	return true
-}
-
-// reorderMessage chooses a random delay between ReorderMinDelay and ReorderMaxDelay
-// (seconds) and schedules the delayed send.
-// It returns true if the message delivery is scheduled for later, false otherwise.
-func (s *Server) reorderMessage(msg *pb.Envelope) (bool, error) {
-	min := s.testConfig.ReorderMinDelay
-	max := s.testConfig.ReorderMaxDelay
-
-	if min > max {
-		return false, fmt.Errorf("ReorderMinDelay (%d) cannot be greater than ReorderMaxDelay (%d)", min, max)
-	}
-
-	var secs int
-	if max == min {
-		secs = min
-	} else {
-		secs = s.randIntn(max-min+1) + min
-	}
-	d := time.Duration(secs) * time.Second
-	if scheduled := s.delaySendWithDuration(msg, d); scheduled {
-		return true, nil // skip immediate send; delayed goroutine will deliver
-	}
-	// Destination unknown right now; fall back to immediate send by returning false
-	return false, nil
-}
-
-// handleMessageEvents processes message events (drop, duplicate, reorder).
-// It returns (true, nil) if the message delivery should be skipped (dropped or scheduled for later).
-// It returns (false, nil) if the message should be sent immediately.
-// It returns (false, err) if an error occurred during processing.
-func (s *Server) handleMessageEvents(msg *pb.Envelope) (bool, error) {
-	// Do not manipulate messages involving TESTER or the controller itself ("CTRL").
-	// Reordering controller-bound traffic can cause unknown-destination during startup/reset.
-	if isTesterMsg(msg) || isControlMsg(msg) {
-		return false, nil
-	}
-
-	if s.probCheck(s.testConfig.DropProb) {
-		if err := s.dropMessage(msg); err != nil {
-			return false, fmt.Errorf("[DROP ERR] %v", err)
-		}
-		return true, nil
-	}
-
-	if s.probCheck(s.testConfig.DupeProb) {
-		if err := s.duplicateMessage(msg); err != nil {
-			return false, fmt.Errorf("[DUPE ERR] %v", err)
-		}
-		return false, nil
-	}
-
-	if s.probCheck(s.testConfig.ReorderProb) {
-		scheduled, err := s.reorderMessage(msg)
-		if err != nil {
-			return false, fmt.Errorf("[REORD ERR] %v", err)
-		}
-		if scheduled {
-			// message delivery delayed; do not send now
-			return true, nil
-		}
-	}
-
-	return false, nil
 }
