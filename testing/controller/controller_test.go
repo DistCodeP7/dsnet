@@ -63,8 +63,8 @@ func TestCreatePartition(t *testing.T) {
 // This ensures Send is not invoked for blocked pairs.
 func TestForward_DropsWhenBlocked(t *testing.T) {
 	s := &Server{
-		nodes:   make(map[string]*Node),
-		blocked: make(map[string]map[string]bool),
+		nodes:      make(map[string]*Node),
+		blocked:    make(map[string]map[string]bool),
 		testConfig: TestConfig{},
 	}
 
@@ -88,8 +88,8 @@ func TestForward_DropsWhenBlocked(t *testing.T) {
 // Test forward with unknown destination should not panic even when not blocked.
 func TestForward_UnknownDestination(t *testing.T) {
 	s := &Server{
-		nodes:   make(map[string]*Node),
-		blocked: make(map[string]map[string]bool),
+		nodes:      make(map[string]*Node),
+		blocked:    make(map[string]map[string]bool),
 		testConfig: TestConfig{},
 	}
 
@@ -102,4 +102,41 @@ func TestForward_UnknownDestination(t *testing.T) {
 		}
 	}()
 	s.forward(env)
+}
+
+// Test fillDefault sets default values in TestConfig when fields are zero-valued.
+func TestFillDefault(t *testing.T) {
+	s := &Server{
+		testConfig: TestConfig{
+			DisableMessageDelays: false,
+		},
+	}
+	s.testConfig.fillDefaults()
+	tc := s.testConfig
+
+	if tc.MsgDropProb < 0 || tc.MsgDropProb > 1 {
+		t.Fatalf("MsgDropProb out of bounds after fillDefaults: %f", tc.MsgDropProb)
+	}
+	if tc.MsgDupeProb < 0 || tc.MsgDupeProb > 1 {
+		t.Fatalf("MsgDupeProb out of bounds after fillDefaults: %f", tc.MsgDupeProb)
+	}
+	if !tc.DisableMessageDelays {
+		if tc.MsgDelayMin <= 0 {
+			t.Fatalf("MsgDelayMin not set to default after fillDefaults: %d", tc.MsgDelayMin)
+		}
+		if tc.MsgDelayMax <= 0 {
+			t.Fatalf("MsgDelayMax not set to default after fillDefaults: %d", tc.MsgDelayMax)
+		}
+	}
+	if tc.EnableNetworkSpikes {
+		if tc.NetSpikeSmallProb <= 0 || tc.NetSpikeSmallProb >= 1 {
+			t.Fatalf("NetSpikeSmallProb out of bounds after fillDefaults: %f", tc.NetSpikeSmallProb)
+		}
+		if tc.NetSpikeMedProb <= 0 || tc.NetSpikeMedProb >= 1 {
+			t.Fatalf("NetSpikeMedProb out of bounds after fillDefaults: %f", tc.NetSpikeMedProb)
+		}
+		if tc.NetSpikeLargeProb <= 0 || tc.NetSpikeLargeProb >= 1 {
+			t.Fatalf("NetSpikeLargeProb out of bounds after fillDefaults: %f", tc.NetSpikeLargeProb)
+		}
+	}
 }

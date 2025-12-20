@@ -38,18 +38,18 @@ type Node struct {
 // These include probabilities for message drops, duplications, and reordering,
 // as well as parameters for reordering delays.
 type TestConfig struct {
-	DropProb               float64
-	DupeProb               float64
-	AsyncDuplicate         bool
-	DisableReorderMessages bool
-	ReorderMinDelay        int
-	ReorderMaxDelay        int
+	MsgDropProb          float64
+	MsgDupeProb          float64
+	AsyncDuplicate       bool
+	DisableMessageDelays bool
+	MsgDelayMin          int
+	MsgDelayMax          int
 
 	//Network Spikes
-	EnableNetworkSpike bool
-	NetSpikeSmallProb  float64
-	NetSpikeMedProb    float64
-	NetSpikeLargeProb  float64
+	EnableNetworkSpikes bool
+	NetSpikeSmallProb   float64
+	NetSpikeMedProb     float64
+	NetSpikeLargeProb   float64
 }
 
 // Server implements the DSNet network controller with testing capabilities.
@@ -70,20 +70,19 @@ type Server struct {
 	logMu   sync.Mutex
 }
 
-// NewTestConfig creates a new TestConfig with the specified parameters.
-func NewTestConfig(dropp float64, dupep float64, reordMessages bool, asyncDup bool, reordMin int, reordMax int) TestConfig {
-	return TestConfig{
-		DropProb:               dropp,
-		DupeProb:               dupep,
-		DisableReorderMessages: reordMessages,
-		AsyncDuplicate:         asyncDup,
-		ReorderMinDelay:        reordMin,
-		ReorderMaxDelay:        reordMax,
-
-		EnableNetworkSpike: false,
-		NetSpikeSmallProb:  0.02,
-		NetSpikeMedProb:    0.005,
-		NetSpikeLargeProb:  0.001,
+func (cfg *TestConfig) fillDefaults() {
+	if !cfg.DisableMessageDelays {
+		if cfg.MsgDelayMin <= 0 {
+			cfg.MsgDelayMin = 1
+		}
+		if cfg.MsgDelayMax <= 0 {
+			cfg.MsgDelayMax = 5
+		}
+	}
+	if cfg.EnableNetworkSpikes {
+		cfg.NetSpikeSmallProb = 0.02
+		cfg.NetSpikeMedProb = 0.005
+		cfg.NetSpikeLargeProb = 0.001
 	}
 }
 
