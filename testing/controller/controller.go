@@ -38,15 +38,15 @@ type Node struct {
 // These include probabilities for message drops, duplications, and reordering,
 // as well as parameters for reordering delays.
 type TestConfig struct {
-	MsgDropProb          float64
-	MsgDupeProb          float64
-	AsyncDuplicate       bool
-	DisableMessageDelays bool
-	MsgDelayMin          int
-	MsgDelayMax          int
+	DropProb        float64
+	DupeProb        float64
+	AsyncDuplicate  bool
+	ReorderMessages bool
+	ReorderMinDelay int
+	ReorderMaxDelay int
 
 	//Network Spikes
-	EnableNetworkSpikes bool
+	NetworkSpikeEnabled bool
 	NetSpikeSmallProb   float64
 	NetSpikeMedProb     float64
 	NetSpikeLargeProb   float64
@@ -70,26 +70,25 @@ type Server struct {
 	logMu   sync.Mutex
 }
 
-// FillDefaults sets default values in TestConfig when fields are zero-valued.
-func (cfg *TestConfig) FillDefaults() {
-	if !cfg.DisableMessageDelays {
-		if cfg.MsgDelayMin <= 0 {
-			cfg.MsgDelayMin = 1
-		}
-		if cfg.MsgDelayMax <= 0 {
-			cfg.MsgDelayMax = 5
-		}
-	}
-	if cfg.EnableNetworkSpikes {
-		cfg.NetSpikeSmallProb = 0.02
-		cfg.NetSpikeMedProb = 0.005
-		cfg.NetSpikeLargeProb = 0.001
+// NewTestConfig creates a new TestConfig with the specified parameters.
+func NewTestConfig(dropp float64, dupep float64, reordMessages bool, asyncDup bool, reordMin int, reordMax int) TestConfig {
+	return TestConfig{
+		DropProb:        dropp,
+		DupeProb:        dupep,
+		ReorderMessages: reordMessages,
+		AsyncDuplicate:  asyncDup,
+		ReorderMinDelay: reordMin,
+		ReorderMaxDelay: reordMax,
+
+		NetworkSpikeEnabled: true,
+		NetSpikeSmallProb:   0.02,
+		NetSpikeMedProb:     0.005,
+		NetSpikeLargeProb:   0.001,
 	}
 }
 
 // newServer creates a new DSNet controller server with the specified test configuration.
 func NewServer(cfg TestConfig) *Server {
-	cfg.FillDefaults()
 	f, err := os.OpenFile("trace_log.jsonl", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Fatalf("Failed to open execution log file: %v", err)

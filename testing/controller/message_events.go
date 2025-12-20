@@ -45,21 +45,21 @@ func (s *Server) handleMessageEvents(msg *pb.Envelope) (bool, error) {
 		return false, nil
 	}
 
-	if s.probCheck(s.testConfig.MsgDropProb) {
+	if s.probCheck(s.testConfig.DropProb) {
 		if err := s.dropMessage(msg); err != nil {
 			return false, fmt.Errorf("[DROP ERR] %v", err)
 		}
 		return true, nil
 	}
 
-	if s.probCheck(s.testConfig.MsgDupeProb) {
+	if s.probCheck(s.testConfig.DupeProb) {
 		if err := s.duplicateMessage(msg); err != nil {
 			return false, fmt.Errorf("[DUPE ERR] %v", err)
 		}
 		return false, nil
 	}
 
-	if !s.testConfig.DisableMessageDelays {
+	if s.testConfig.ReorderMessages {
 		scheduled, err := s.reorderMessage(msg)
 		if err != nil {
 			return false, fmt.Errorf("[REORD ERR] %v", err)
@@ -123,28 +123,25 @@ func (s *Server) duplicateMessage(msg *pb.Envelope) error {
 // (milliseconds) and schedules the delayed send.
 // It returns true if the message delivery is scheduled for later, false otherwise.
 func (s *Server) reorderMessage(msg *pb.Envelope) (bool, error) {
-	min := s.testConfig.MsgDelayMin
-	max := s.testConfig.MsgDelayMax
+	min := s.testConfig.ReorderMinDelay
+	max := s.testConfig.ReorderMaxDelay
 
 	if min > max {
 		return false, fmt.Errorf("reorderMinDelay (%d) cannot be greater than ReorderMaxDelay (%d)", min, max)
 	}
 
 	spike := 0
-	if s.testConfig.EnableNetworkSpikes {
+	if s.testConfig.NetworkSpikeEnabled {
 		spike = s.latencySpike()
 	}
 
 	var duration int
-	if max == min {
+	if spike > 0 {
+		duration = spike
+	} else if max == min {
 		duration = min
 	} else {
 		duration = s.randIntn(max-min+1) + min
-	}
-
-	if spike > duration {
-		duration = spike
-		log.Printf("[SPIKE] Message latency spiked by %d for message %s", spike, msg.Type)
 	}
 
 	d := time.Duration(duration) * time.Millisecond
@@ -183,8 +180,8 @@ func (s *Server) delaySendWithDuration(msg *pb.Envelope, d time.Duration) bool {
 	clone := proto.Clone(msg).(*pb.Envelope)
 
 	go func(n sender, m *pb.Envelope, d time.Duration) {
-		min := time.Duration(s.testConfig.MsgDelayMin) * time.Millisecond
-		max := time.Duration(s.testConfig.MsgDelayMax) * time.Millisecond
+		min := time.Duration(s.testConfig.ReorderMinDelay) * time.Millisecond
+		max := time.Duration(s.testConfig.ReorderMaxDelay) * time.Millisecond
 
 		if d == 0 {
 			return

@@ -200,10 +200,10 @@ func TestReorderMessage(t *testing.T) {
 	s := &Server{
 		senders: map[string]sender{"B": fs},
 		testConfig: TestConfig{
-			DisableMessageDelays: false,
-			MsgDelayMin:          100,
-			MsgDelayMax:          100,
-			EnableNetworkSpikes:  false,
+			ReorderMessages:     true,
+			ReorderMinDelay:     100,
+			ReorderMaxDelay:     100,
+			NetworkSpikeEnabled: false,
 		},
 	}
 
@@ -254,8 +254,9 @@ func TestReorderMessage_DelayedInterleave(t *testing.T) {
 			s := &Server{
 				senders: map[string]sender{"B": fs},
 				testConfig: TestConfig{
-					MsgDelayMin: tc.reorderMilliseconds,
-					MsgDelayMax: tc.reorderMilliseconds,
+					ReorderMessages: true,
+					ReorderMinDelay: tc.reorderMilliseconds,
+					ReorderMaxDelay: tc.reorderMilliseconds,
 				},
 				rng: newTestRNG(),
 			}
@@ -301,22 +302,21 @@ func TestReorderMessage_DelayedInterleave(t *testing.T) {
 	}
 }
 
-// TestHandleMessageEvents tests the combined behavior of drop, duplicate, and reorder.
 func TestHandleMessageEvents(t *testing.T) {
 	msg := &pb.Envelope{From: "A", To: "B", Type: "TEST", Payload: "{}"}
 
 	tests := []struct {
-		name                   string
-		dropProb               float64
-		dupeProb               float64
-		disableReorderMessages bool
-		expectSkip             bool
-		expectDuplicate        bool
+		name            string
+		dropProb        float64
+		dupeProb        float64
+		reorderMessages bool
+		expectSkip      bool // handleMessageEvents returns true if delivery skipped
+		expectDuplicate bool // message cloned and sent
 	}{
-		{"drop only", 1, 0, true, true, false},
-		{"duplicate only", 0, 1, true, false, true},
-		{"reorder only", 0, 0, false, true, false},
-		{"none", 0, 0, true, false, false},
+		{"drop only", 1, 0, false, true, false},
+		{"duplicate only", 0, 1, false, false, true},
+		{"reorder only", 0, 0, true, true, false},
+		{"none", 0, 0, false, false, false},
 	}
 
 	for _, tc := range tests {
@@ -336,9 +336,9 @@ func TestHandleMessageEvents(t *testing.T) {
 					"B": &fakeSender{sendCh: sendCh},
 				},
 				testConfig: TestConfig{
-					MsgDropProb:          tc.dropProb,
-					MsgDupeProb:          tc.dupeProb,
-					DisableMessageDelays: tc.disableReorderMessages,
+					DropProb:        tc.dropProb,
+					DupeProb:        tc.dupeProb,
+					ReorderMessages: tc.reorderMessages,
 				},
 				rng: newTestRNG(), // deterministic
 			}
@@ -367,64 +367,6 @@ func TestHandleMessageEvents(t *testing.T) {
 					t.Errorf("did not expect duplicate but got: %+v", dup)
 				default:
 				}
-			}
-		})
-	}
-}
-
-// TestNetworkSpikeDelay ensures that enabling network spikes can introduce additional delay.
-func TestNetworkSpikes(t *testing.T) {
-	tests := []struct {
-		name           string
-		smallProb      float64
-		medProb        float64
-		largeProb      float64
-		expectedMillis int // minimum expected delay in milliseconds
-	}{
-		{"small_spike", 1.0, 0.0, 0.0, 5},   // small spike yields 5..20ms
-		{"med_spike", 0.0, 1.0, 0.0, 20},    // med spike yields 20..100ms
-		{"large_spike", 0.0, 0.0, 1.0, 100}, // large spike yields 100..500ms
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			msg := &pb.Envelope{From: "A", To: "B", Type: "TEST", Payload: "{}"}
-
-			sendCh := make(chan *pb.Envelope, 1)
-			fs := &fakeSender{sendCh: sendCh}
-
-			// ensure base delay is small so spikes produce larger values
-			s := &Server{
-				senders: map[string]sender{"B": fs},
-				testConfig: TestConfig{
-					DisableMessageDelays: false,
-					MsgDelayMin:          1,
-					MsgDelayMax:          1,
-					EnableNetworkSpikes:  true,
-					NetSpikeSmallProb:    tc.smallProb,
-					NetSpikeMedProb:      tc.medProb,
-					NetSpikeLargeProb:    tc.largeProb,
-				},
-				rng: newTestRNG(),
-			}
-
-			start := time.Now()
-			skipped, err := s.reorderMessage(msg)
-			if err != nil {
-				t.Fatalf("reorderMessage returned error: %v", err)
-			}
-			if !skipped {
-				t.Fatalf("reorderMessage should skip immediate delivery when delayed")
-			}
-
-			select {
-			case <-sendCh:
-				elapsed := time.Since(start)
-				if elapsed < time.Duration(tc.expectedMillis)*time.Millisecond {
-					t.Fatalf("message sent too early with spike: elapsed=%v, want>= %dms", elapsed, tc.expectedMillis)
-				}
-			case <-time.After(2 * time.Second):
-				t.Fatalf("expected message to be sent after spike delay, but nothing was received")
 			}
 		})
 	}

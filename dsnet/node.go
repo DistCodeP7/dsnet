@@ -171,6 +171,11 @@ func (n *Node) runRecvLoop() {
 			return
 		}
 
+		if envelope.Type == "STOP" {
+			n.Close()
+			os.Exit(0)
+		}
+
 		n.vcMu.Lock()
 		incomingVec := n.fromProtoVector(envelope.Vector)
 		for id, val := range incomingVec {
