@@ -200,10 +200,10 @@ func TestReorderMessage(t *testing.T) {
 	s := &Server{
 		senders: map[string]sender{"B": fs},
 		testConfig: TestConfig{
-			ReorderMessages:     true,
-			ReorderMinDelay:     100,
-			ReorderMaxDelay:     100,
-			NetworkSpikeEnabled: false,
+			DisableReorderMessages: false,
+			ReorderMinDelay:        100,
+			ReorderMaxDelay:        100,
+			EnableNetworkSpike:     false,
 		},
 	}
 
@@ -254,9 +254,9 @@ func TestReorderMessage_DelayedInterleave(t *testing.T) {
 			s := &Server{
 				senders: map[string]sender{"B": fs},
 				testConfig: TestConfig{
-					ReorderMessages: true,
-					ReorderMinDelay: tc.reorderMilliseconds,
-					ReorderMaxDelay: tc.reorderMilliseconds,
+					DisableReorderMessages: false,
+					ReorderMinDelay:        tc.reorderMilliseconds,
+					ReorderMaxDelay:        tc.reorderMilliseconds,
 				},
 				rng: newTestRNG(),
 			}
@@ -336,9 +336,9 @@ func TestHandleMessageEvents(t *testing.T) {
 					"B": &fakeSender{sendCh: sendCh},
 				},
 				testConfig: TestConfig{
-					DropProb:        tc.dropProb,
-					DupeProb:        tc.dupeProb,
-					ReorderMessages: tc.reorderMessages,
+					DropProb:               tc.dropProb,
+					DupeProb:               tc.dupeProb,
+					DisableReorderMessages: !tc.reorderMessages,
 				},
 				rng: newTestRNG(), // deterministic
 			}

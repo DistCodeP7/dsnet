@@ -38,18 +38,18 @@ type Node struct {
 // These include probabilities for message drops, duplications, and reordering,
 // as well as parameters for reordering delays.
 type TestConfig struct {
-	DropProb        float64
-	DupeProb        float64
-	AsyncDuplicate  bool
-	ReorderMessages bool
-	ReorderMinDelay int
-	ReorderMaxDelay int
+	DropProb               float64
+	DupeProb               float64
+	AsyncDuplicate         bool
+	DisableReorderMessages bool
+	ReorderMinDelay        int
+	ReorderMaxDelay        int
 
 	//Network Spikes
-	NetworkSpikeEnabled bool
-	NetSpikeSmallProb   float64
-	NetSpikeMedProb     float64
-	NetSpikeLargeProb   float64
+	EnableNetworkSpike bool
+	NetSpikeSmallProb  float64
+	NetSpikeMedProb    float64
+	NetSpikeLargeProb  float64
 }
 
 // Server implements the DSNet network controller with testing capabilities.
@@ -73,17 +73,17 @@ type Server struct {
 // NewTestConfig creates a new TestConfig with the specified parameters.
 func NewTestConfig(dropp float64, dupep float64, reordMessages bool, asyncDup bool, reordMin int, reordMax int) TestConfig {
 	return TestConfig{
-		DropProb:        dropp,
-		DupeProb:        dupep,
-		ReorderMessages: reordMessages,
-		AsyncDuplicate:  asyncDup,
-		ReorderMinDelay: reordMin,
-		ReorderMaxDelay: reordMax,
+		DropProb:               dropp,
+		DupeProb:               dupep,
+		DisableReorderMessages: reordMessages,
+		AsyncDuplicate:         asyncDup,
+		ReorderMinDelay:        reordMin,
+		ReorderMaxDelay:        reordMax,
 
-		NetworkSpikeEnabled: true,
-		NetSpikeSmallProb:   0.02,
-		NetSpikeMedProb:     0.005,
-		NetSpikeLargeProb:   0.001,
+		EnableNetworkSpike: false,
+		NetSpikeSmallProb:  0.02,
+		NetSpikeMedProb:    0.005,
+		NetSpikeLargeProb:  0.001,
 	}
 }
 
