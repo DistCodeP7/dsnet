@@ -59,7 +59,7 @@ func (s *Server) handleMessageEvents(msg *pb.Envelope) (bool, error) {
 		return false, nil
 	}
 
-	if s.testConfig.ReorderMessages {
+	if !s.testConfig.DisableReorderMessages {
 		scheduled, err := s.reorderMessage(msg)
 		if err != nil {
 			return false, fmt.Errorf("[REORD ERR] %v", err)
@@ -131,17 +131,19 @@ func (s *Server) reorderMessage(msg *pb.Envelope) (bool, error) {
 	}
 
 	spike := 0
-	if s.testConfig.NetworkSpikeEnabled {
+	if s.testConfig.EnableNetworkSpike {
 		spike = s.latencySpike()
 	}
 
 	var duration int
-	if spike > 0 {
-		duration = spike
-	} else if max == min {
+	if max == min {
 		duration = min
 	} else {
 		duration = s.randIntn(max-min+1) + min
+	}
+
+	if spike > duration {
+		duration = spike
 	}
 
 	d := time.Duration(duration) * time.Millisecond
