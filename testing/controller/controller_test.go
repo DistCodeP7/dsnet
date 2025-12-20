@@ -111,7 +111,7 @@ func TestFillDefault(t *testing.T) {
 			DisableMessageDelays: false,
 		},
 	}
-	s.testConfig.fillDefaults()
+	s.testConfig.FillDefaults()
 	tc := s.testConfig
 
 	if tc.MsgDropProb < 0 || tc.MsgDropProb > 1 {
