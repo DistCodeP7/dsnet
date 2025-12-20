@@ -70,6 +70,7 @@ type Server struct {
 	logMu   sync.Mutex
 }
 
+// fillDefaults sets default values in TestConfig when fields are zero-valued.
 func (cfg *TestConfig) fillDefaults() {
 	if !cfg.DisableMessageDelays {
 		if cfg.MsgDelayMin <= 0 {
