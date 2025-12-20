@@ -70,8 +70,8 @@ type Server struct {
 	logMu   sync.Mutex
 }
 
-// fillDefaults sets default values in TestConfig when fields are zero-valued.
-func (cfg *TestConfig) fillDefaults() {
+// FillDefaults sets default values in TestConfig when fields are zero-valued.
+func (cfg *TestConfig) FillDefaults() {
 	if !cfg.DisableMessageDelays {
 		if cfg.MsgDelayMin <= 0 {
 			cfg.MsgDelayMin = 1
@@ -89,6 +89,7 @@ func (cfg *TestConfig) fillDefaults() {
 
 // newServer creates a new DSNet controller server with the specified test configuration.
 func NewServer(cfg TestConfig) *Server {
+	cfg.FillDefaults()
 	f, err := os.OpenFile("trace_log.jsonl", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Fatalf("Failed to open execution log file: %v", err)
