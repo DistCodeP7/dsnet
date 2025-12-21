@@ -293,6 +293,9 @@ func Serve(cfg TestConfig) {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
+	// Ensure configuration defaults are applied even when callers pass a struct literal
+	cfg.FillDefaults()
+
 	srv := NewServer(cfg)
 
 	grpcServer := grpc.NewServer()

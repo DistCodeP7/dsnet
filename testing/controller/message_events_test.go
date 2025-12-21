@@ -260,7 +260,6 @@ func TestReorderMessage_DelayedInterleave(t *testing.T) {
 				},
 				rng: newTestRNG(),
 			}
-
 			start := time.Now()
 
 			// schedule delayed message
@@ -307,9 +306,9 @@ func TestHandleMessageEvents(t *testing.T) {
 
 	tests := []struct {
 		name                 string
-		dropProb             float64
-		dupeProb             float64
-		disableMessageDelays bool
+		MsgDropProb          float64
+		MsgDupeProb          float64
+		DisableMessageDelays bool
 		expectSkip           bool // handleMessageEvents returns true if delivery skipped
 		expectDuplicate      bool // message cloned and sent
 	}{
@@ -336,13 +335,14 @@ func TestHandleMessageEvents(t *testing.T) {
 					"B": &fakeSender{sendCh: sendCh},
 				},
 				testConfig: TestConfig{
-					MsgDropProb:          tc.dropProb,
-					MsgDupeProb:          tc.dupeProb,
-					DisableMessageDelays: tc.disableMessageDelays,
+					MsgDropProb:          tc.MsgDropProb,
+					MsgDupeProb:          tc.MsgDupeProb,
+					DisableMessageDelays: tc.DisableMessageDelays,
 				},
 				rng: newTestRNG(), // deterministic
 			}
 			s.nodes["B"].alive.Store(true)
+			s.testConfig.FillDefaults()
 
 			skip, err := s.handleMessageEvents(msg)
 			if err != nil {

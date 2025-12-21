@@ -1,5 +1,4 @@
-# --- Build stage ---
-FROM golang:1.25.4-alpine AS builder
+FROM golang:1.25.4-alpine
 
 ENV GO111MODULE=on \
     CGO_ENABLED=0 \
@@ -7,27 +6,20 @@ ENV GO111MODULE=on \
 
 WORKDIR /app/tmp
 
-COPY go.mod go.sum ./
-COPY . .
+# Copy source and module files
+COPY warmup/modules.go .
+COPY wrapper.go .
+COPY go.mod .
+COPY go.sum .
 
-# Install dependencies and build wrapper binary
-RUN apk add --no-cache curl ca-certificates \
+# Install required packages and build the wrapper binary
+RUN apk add --no-cache curl ca-certificates bash git \
     && go mod tidy \
     && go mod download \
-    && go build -o /app/wrapper ./wrapper.go
+    && rm modules.go \
+    && go build -o wrapper ./wrapper.go \
+    && rm wrapper.go \
+    && chmod +x wrapper
 
-# --- Runtime stage ---
-FROM alpine:latest
-
-WORKDIR /app
-
-# Install runtime utilities required by distcode_worker tests (ping, timeout)
-RUN apk add --no-cache iputils coreutils
-
-# Copy only the binary and preserve /tmp folder
-COPY --from=builder /app/wrapper .
-RUN mkdir -p /app/tmp
-
-EXPOSE 8090
-
+# Command to run
 CMD ["./wrapper", "cmd", "./prog"]
