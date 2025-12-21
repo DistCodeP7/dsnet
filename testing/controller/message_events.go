@@ -45,21 +45,21 @@ func (s *Server) handleMessageEvents(msg *pb.Envelope) (bool, error) {
 		return false, nil
 	}
 
-	if s.probCheck(s.testConfig.DropProb) {
+	if s.probCheck(s.testConfig.MsgDropProb) {
 		if err := s.dropMessage(msg); err != nil {
 			return false, fmt.Errorf("[DROP ERR] %v", err)
 		}
 		return true, nil
 	}
 
-	if s.probCheck(s.testConfig.DupeProb) {
+	if s.probCheck(s.testConfig.MsgDupeProb) {
 		if err := s.duplicateMessage(msg); err != nil {
 			return false, fmt.Errorf("[DUPE ERR] %v", err)
 		}
 		return false, nil
 	}
 
-	if s.testConfig.ReorderMessages {
+	if !s.testConfig.DisableMessageDelays {
 		scheduled, err := s.reorderMessage(msg)
 		if err != nil {
 			return false, fmt.Errorf("[REORD ERR] %v", err)
@@ -123,25 +123,29 @@ func (s *Server) duplicateMessage(msg *pb.Envelope) error {
 // (milliseconds) and schedules the delayed send.
 // It returns true if the message delivery is scheduled for later, false otherwise.
 func (s *Server) reorderMessage(msg *pb.Envelope) (bool, error) {
-	min := s.testConfig.ReorderMinDelay
-	max := s.testConfig.ReorderMaxDelay
+	min := s.testConfig.MsgMinDelay
+	max := s.testConfig.MsgMaxDelay
 
 	if min > max {
 		return false, fmt.Errorf("reorderMinDelay (%d) cannot be greater than ReorderMaxDelay (%d)", min, max)
 	}
 
 	spike := 0
-	if s.testConfig.NetworkSpikeEnabled {
+	if s.testConfig.EnableNetworkSpikes {
 		spike = s.latencySpike()
 	}
 
 	var duration int
-	if spike > 0 {
-		duration = spike
-	} else if max == min {
+
+	if max == min {
 		duration = min
 	} else {
 		duration = s.randIntn(max-min+1) + min
+	}
+
+	if spike > duration {
+		duration = spike
+		log.Printf("[SPIKE] Message latency spiked by %dms", duration)
 	}
 
 	d := time.Duration(duration) * time.Millisecond
@@ -169,8 +173,14 @@ func (s *Server) latencySpike() int {
 // delaySendWithDuration sends a scheduled message after a set amount of time.
 // delaySendWithDuration schedules a delayed delivery. Returns true if scheduled, false otherwise.
 func (s *Server) delaySendWithDuration(msg *pb.Envelope, d time.Duration) bool {
+	if d == 0 {
+		return false
+	}
+
 	s.mu.Lock()
 	target, ok := s.senders[msg.To]
+	min := time.Duration(s.testConfig.MsgMinDelay) * time.Millisecond
+	max := time.Duration(s.testConfig.MsgMaxDelay) * time.Millisecond
 	s.mu.Unlock()
 	if !ok {
 		log.Printf("[REORD ERR] Unknown destination for delayed send: %s", msg.To)
@@ -180,13 +190,6 @@ func (s *Server) delaySendWithDuration(msg *pb.Envelope, d time.Duration) bool {
 	clone := proto.Clone(msg).(*pb.Envelope)
 
 	go func(n sender, m *pb.Envelope, d time.Duration) {
-		min := time.Duration(s.testConfig.ReorderMinDelay) * time.Millisecond
-		max := time.Duration(s.testConfig.ReorderMaxDelay) * time.Millisecond
-
-		if d == 0 {
-			return
-		}
-
 		isSpike := d < min || d > max
 		if isSpike {
 			log.Printf("[REORD] Network spike delaying %s: %s -> %s for %v", m.Type, m.From, m.To, d)
