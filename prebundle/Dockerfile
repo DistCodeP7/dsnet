@@ -11,7 +11,6 @@ COPY warmup/modules.go .
 COPY wrapper.go .
 COPY go.mod .
 COPY go.sum .
-COPY ./prog ./prog
 
 # Install required packages and build the wrapper binary
 RUN apk add --no-cache curl ca-certificates bash git \
