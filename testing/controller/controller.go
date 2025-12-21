@@ -38,15 +38,15 @@ type Node struct {
 // These include probabilities for message drops, duplications, and reordering,
 // as well as parameters for reordering delays.
 type TestConfig struct {
-	DropProb        float64
-	DupeProb        float64
-	AsyncDuplicate  bool
-	ReorderMessages bool
-	ReorderMinDelay int
-	ReorderMaxDelay int
+	MsgDropProb          float64
+	MsgDupeProb          float64
+	AsyncDuplicate       bool
+	DisableMessageDelays bool
+	MsgMinDelay          int
+	MsgMaxDelay          int
 
 	//Network Spikes
-	NetworkSpikeEnabled bool
+	EnableNetworkSpikes bool
 	NetSpikeSmallProb   float64
 	NetSpikeMedProb     float64
 	NetSpikeLargeProb   float64
@@ -70,20 +70,27 @@ type Server struct {
 	logMu   sync.Mutex
 }
 
-// NewTestConfig creates a new TestConfig with the specified parameters.
-func NewTestConfig(dropp float64, dupep float64, reordMessages bool, asyncDup bool, reordMin int, reordMax int) TestConfig {
-	return TestConfig{
-		DropProb:        dropp,
-		DupeProb:        dupep,
-		ReorderMessages: reordMessages,
-		AsyncDuplicate:  asyncDup,
-		ReorderMinDelay: reordMin,
-		ReorderMaxDelay: reordMax,
+// FillDefaults fills in default values for TestConfig fields if they are not set.
+func (cfg *TestConfig) FillDefaults() {
+	if !cfg.DisableMessageDelays {
+		if cfg.MsgMinDelay <= 0 {
+			cfg.MsgMinDelay = 1
+		}
+		if cfg.MsgMaxDelay <= 0 {
+			cfg.MsgMaxDelay = 5
+		}
+	}
 
-		NetworkSpikeEnabled: true,
-		NetSpikeSmallProb:   0.02,
-		NetSpikeMedProb:     0.005,
-		NetSpikeLargeProb:   0.001,
+	if cfg.EnableNetworkSpikes {
+		if cfg.NetSpikeSmallProb < 0 || cfg.NetSpikeSmallProb > 1 {
+			cfg.NetSpikeSmallProb = 0.02
+		}
+		if cfg.NetSpikeMedProb < 0 || cfg.NetSpikeMedProb > 1 {
+			cfg.NetSpikeMedProb = 0.005
+		}
+		if cfg.NetSpikeLargeProb < 0 || cfg.NetSpikeLargeProb > 1 {
+			cfg.NetSpikeLargeProb = 0.0001
+		}
 	}
 }
 
@@ -286,6 +293,9 @@ func Serve(cfg TestConfig) {
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
+
+	// Ensure configuration defaults are applied even when callers pass a struct literal
+	cfg.FillDefaults()
 
 	srv := NewServer(cfg)
 
